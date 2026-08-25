@@ -38,23 +38,23 @@ jobs:
       
       - name: Create IPA from built app
         run: |
-          # Find the .app built
-          APP_DIR=$(find build/ios/release -name "*.app" -type d | head -1)
+          # Find the .app built (Flutter 3.x outputs to iphoneos or Release-iphoneos)
+          APP_DIR=$(find build/ios -name "*.app" -type d | head -1)
           echo "Found app: $APP_DIR"
-          
+
           if [ -n "$APP_DIR" ]; then
             # Create Payload directory and copy .app into it
             mkdir -p Payload
             cp -r "$(basename "$APP_DIR")" Payload/
-            
-            # Zip it to create IPA
+
+            # Zip it to create IPA (IPA is just a zip with Payload/)
             zip -r quran-app-ios.ipa Payload
             rm -rf Payload
-            
+
             echo "Created IPA: $(pwd)/quran-app-ios.ipa"
             ls -lh quran-app-ios.ipa
           else
-            echo "ERROR: No .app found in build/ios/release"
+            echo "ERROR: No .app found"
             find build/ios -name "*.app" 2>/dev/null | head -5
             exit 1
           fi
