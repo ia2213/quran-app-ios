@@ -4,28 +4,16 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      build_type:
-        description: 'Build type'
-        required: true
-        default: 'debug'
-        type: choice
-        options:
-          - debug
-          - release
-          - profile
 
 jobs:
   build-ios:
-    name: Build iOS
+    name: Build iOS Device IPA
     runs-on: macos-latest
     timeout-minutes: 60
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -33,65 +21,69 @@ jobs:
           flutter-version: '3.22.2'
           channel: 'stable'
           cache: true
-          cache-key: flutter-ios-${{ runner.os }}-${{ hashFiles('**/pubspec.lock') }}
       
-      - name: Get Flutter dependencies
+      - name: Get dependencies
         run: flutter pub get
-        working-directory: .
       
-      - name: Verify Flutter
+      - name: Build iOS project info
         run: |
           flutter doctor -v
-          flutter --version
+          echo "Flutter version: $(flutter --version | head -1)"
       
-      - name: Configure iOS signing (for simulator build)
+      - name: Build iOS release (no codesign for sideloading)
         run: |
-          # For simulator builds, we don't need provisioning profiles
-          # Just ensure the project is configured correctly
-          xcodebuild -version
-          xcodebuild -showsdks
+          # Build for release but skip code signing (for sideloading via AltStore/SideStore)
+          flutter build ios --release --no-codesign
+          echo "Build complete"
       
-      - name: Build iOS app (simulator)
+      - name: Create IPA from built app
         run: |
-          flutter build ios --debug --simulator --no-codesign
-        working-directory: .
-      
-      - name: Build iOS app (device) - optional, requires signing
-        if: github.event.inputs.build_type != 'debug'
-        run: |
-          # This will fail without proper signing certs
-          # flutter build ios --release --no-codesign
-          echo "Device build requires Apple Developer account and certificates"
-      
-      - name: Package iOS app for simulator
-        if: always()
-        run: |
-          # Find the built app
-          APP_PATH=$(find build/ios/iphonesimulator -name "*.app" | head -1)
-          if [ -n "$APP_PATH" ]; then
-            echo "Found app at: $APP_PATH"
-            # Create a zip for download
-            cd "$(dirname "$APP_PATH")"
-            zip -r "${{ github.workspace }}/quran-app-ios-simulator.zip" "$(basename "$APP_PATH")"
-            echo "Created simulator zip"
+          # Find the .app built
+          APP_DIR=$(find build/ios/release -name "*.app" -type d | head -1)
+          echo "Found app: $APP_DIR"
+          
+          if [ -n "$APP_DIR" ]; then
+            # Create Payload directory and copy .app into it
+            mkdir -p Payload
+            cp -r "$(basename "$APP_DIR")" Payload/
+            
+            # Zip it to create IPA
+            zip -r quran-app-ios.ipa Payload
+            rm -rf Payload
+            
+            echo "Created IPA: $(pwd)/quran-app-ios.ipa"
+            ls -lh quran-app-ios.ipa
           else
-            echo "No .app found for simulator"
-            find build/ios -name "*.app" 2>/dev/null
+            echo "ERROR: No .app found in build/ios/release"
+            find build/ios -name "*.app" 2>/dev/null | head -5
+            exit 1
           fi
       
-      - name: Upload iOS simulator build
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: quran-app-ios-simulator
-          path: quran-app-ios-simulator.zip
-          retention-days: 7
+      - name: Verify IPA
+        run: |
+          if [ -f "quran-app-ios.ipa" ]; then
+            echo "IPA exists: $(ls -lh quran-app-ios.ipa)"
+            # Check it's a valid zip
+            if file quran-app-ios.ipa | grep -q "ZIP"; then
+              echo "IPA is a valid ZIP file"
+            fi
+          else
+            echo "ERROR: IPA was not created"
+            exit 1
+          fi
       
-      - name: Upload build logs
-        if: always()
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: build-logs
-          path: |
-            **/build/ios/**/*.log
-          retention-days: 7
+          name: quran-app-ios-ipa
+          path: quran-app-ios.ipa
+          retention-days: 30
+          if-no-files-found: error
+      
+      - name: Summary
+        run: |
+          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **App**: Quran App (iOS)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Build type**: Release (no codesign)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Install method**: AltStore / SideStore / Sideloadly" >> $GITHUB_STEP_SUMMARY
+          echo "- **Apple ID required**: Your free personal Apple ID" >> $GITHUB_STEP_SUMMARY
