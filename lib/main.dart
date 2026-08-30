@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -617,7 +616,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
   bool _showTransliteration = false;
   bool _speakTranslation = true;
   bool _announceSurah = true;
-  String _ttsVoiceGender = 'female'; // 'male', 'female', or 'default'
+  bool _ttsFemaleVoice = false; // false = masculine, true = feminine (if available)
 
   String _phase = 'idle';
   String? _currentSurahName;
@@ -632,13 +631,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
   bool _isRunning = false;
   bool _stopFlag = false;
   final _player = AudioPlayer();
-  final _ttsPlayer = AudioPlayer();
   String? _currentAudioUrl;
   bool _isPlaying = false;
-  String? _currentTtsUrl;
   bool _isTtsPlaying = false;
   bool _isTtsBuffering = false;
-  final Map<String, String> _ttsUrlCache = {};
   late final TextEditingController _startSurahCtrl = TextEditingController(text: '1');
   late final TextEditingController _startVerseCtrl = TextEditingController(text: '1');
   late final TextEditingController _endSurahCtrl = TextEditingController(text: '1');
@@ -653,20 +649,12 @@ class _RecitationScreenState extends State<RecitationScreen> {
     _player.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlaying = state.playing);
     });
-    _ttsPlayer.playerStateStream.listen((state) {
-      if (mounted) {
-        setState(() => _isTtsPlaying = state.playing);
-        if (state.playing) _isTtsBuffering = false;
-      }
-    });
   }
 
   @override
   void dispose() {
     _stopFlag = true;
     _player.dispose();
-    _ttsPlayer.stop();
-    _ttsPlayer.dispose();
     _startSurahCtrl.dispose();
     _startVerseCtrl.dispose();
     _endSurahCtrl.dispose();
@@ -680,7 +668,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
   void _stop() {
     _stopFlag = true;
     _player.stop();
-    _ttsPlayer.stop();
     if (mounted) {
       setState(() {
         _phase = 'idle';
@@ -690,56 +677,78 @@ class _RecitationScreenState extends State<RecitationScreen> {
     }
   }
 
-  Future<String?> _getTtsUrl(String text, String lang, {String? gender}) async {
-    if (text.isEmpty) return null;
-    // Remove parentheses to avoid URL encoding issues
+  // Google TTS cache
+  final Map<String, String> _ttsUrlCache = {};
+  DateTime? _lastTtsRequest;
+
+  // Build Google TTS URL with client signature for male/female voices
+  String _buildGoogleTtsUrl(String text, String lang, bool female) {
+    // Remove parentheses
     final clean = text.replaceAll(RegExp(r'[()]'), '');
-    final key = '$clean|$lang|$gender';
-    if (_ttsUrlCache.containsKey(key)) return _ttsUrlCache[key];
-    try {
-      // Use local TTS server
-      final uri = Uri.http('127.0.0.1:8766', '/tts', {
-        'text': clean,
-        'lang': lang,
-        'gender': gender ?? _ttsVoiceGender,
-      });
-      final r = await http.get(uri);
-      if (r.statusCode == 200 && r.bodyBytes.isNotEmpty) {
-        final url = uri.toString();
-        _ttsUrlCache[key] = url;
-        return url;
-      }
-    } catch (e) {}
-    return null;
+    // URL encode
+    final encoded = Uri.encodeComponent(clean);
+    // Different strategies: Arabic uses client param, French uses different client params
+    final client = lang == 'ar' ? (female ? 'gws-xsn-dev' : 'tw-ob') : (female ? 'lemon' : 'tw-ob');
+    // Slower rate for clarity
+    final tl = lang == 'ar' ? 'ar-SA' : (lang == 'en' ? 'en-US' : 'fr-FR');
+    return 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=$client&q=$encoded';
   }
 
-  Future<void> _speak(String text, String lang, {String? gender}) async {
-    if (text.isEmpty || _stopFlag) return;
-    final url = await _getTtsUrl(text, lang, gender: gender);
-    if (url == null || _stopFlag) return;
-    try {
-      if (mounted) setState(() => _isTtsBuffering = true);
-      await _ttsPlayer.stop();
-      await _ttsPlayer.setUrl(url);
-      if (mounted) setState(() { _isTtsPlaying = true; _isTtsBuffering = false; });
-      await _ttsPlayer.play();
-      await _waitForTtsStopped();
-    } catch (e) {}
-    if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
-  }
-
-  Future<void> _waitForTtsStopped() async {
-    for (int i = 0; i < 120; i++) {
-      if (_stopFlag) return;
-      final ps = _ttsPlayer.processingState;
-      if (ps == ProcessingState.completed || ps == ProcessingState.idle) return;
-      // Not playing but still loading/buffering
-      if (!_ttsPlayer.playing) {
-        await Future.delayed(const Duration(milliseconds: 1000));
-        continue;
-      }
-      await Future.delayed(const Duration(milliseconds: 300));
+  Future<String?> _getCachedTtsUrl(String text, String lang, bool female) async {
+    if (text.isEmpty) return null;
+    final url = _buildGoogleTtsUrl(text, lang, female);
+    // Check cache (search by key, not value)
+    if (_ttsUrlCache.containsKey(url)) return url;
+    _ttsUrlCache[url] = text;
+    // Limit cache size
+    if (_ttsUrlCache.length > 50) {
+      final first = _ttsUrlCache.keys.first;
+      _ttsUrlCache.remove(first);
     }
+    return url;
+  }
+
+  Future<void> _speak(String text, String lang) async {
+    if (text.isEmpty || _stopFlag) return;
+    try {
+      // Rate limit: prevent spamming Google TTS
+      if (_lastTtsRequest != null) {
+        final elapsed = DateTime.now().difference(_lastTtsRequest!);
+        if (elapsed.inMilliseconds < 500) {
+          await Future.delayed(Duration(milliseconds: 500 - elapsed.inMilliseconds));
+        }
+      }
+      _lastTtsRequest = DateTime.now();
+
+      final url = await _getCachedTtsUrl(text, lang, _ttsFemaleVoice);
+      if (url == null || _stopFlag) return;
+
+      if (mounted) setState(() => _isTtsBuffering = true);
+      await _player.stop();
+      await _player.setUrl(url);
+      if (mounted) setState(() { _isTtsPlaying = true; _isTtsBuffering = false; });
+      await _player.play();
+      // FIX: Wait for actual audio completion by checking player state, NOT _isTtsPlaying
+      // (which is never set to false by playerStateStream — was causing 60s hangs)
+      int attempts = 0;
+      while (!_stopFlag && attempts < 150) {
+        // If player is no longer playing, we're done
+        if (!_player.playing) {
+          final ps = _player.processingState;
+          if (ps == ProcessingState.completed || ps == ProcessingState.idle) break;
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+        attempts++;
+      }
+      // Force stop if still stuck (45s max)
+      if (_isTtsPlaying) {
+        await _player.stop();
+        if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
+      }
+    } catch (e) {
+      debugPrint('TTS error: $e');
+    }
+    if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
   }
 
   // Wait for audio to finish playing (handles all player states correctly)
@@ -786,36 +795,35 @@ class _RecitationScreenState extends State<RecitationScreen> {
         // Announce surah name
         if (surah != lastSurah || _announceEachVerse) {
           String surahEnglish = '';
+          String surahArabic = '';
           try {
             final r = await http.get(Uri.parse('$kBase/surah/$surah'));
             if (r.statusCode == 200) {
               final d = json.decode(r.body) as Map<String, dynamic>;
-              final name = d['data']['name'] as String;
+              surahArabic = d['data']['name'] as String;
               surahEnglish = d['data']['englishName'] as String;
               if (mounted) {
                 setState(() {
-                  _currentSurahName = '$surah · $surahEnglish ($name)';
+                  _currentSurahName = '$surah · $surahEnglish ($surahArabic)';
                 });
               }
             }
           } catch (e) {}
           lastSurah = surah;
-          // Play surah announcement audio in Arabic
-          if (_announceSurah && surahEnglish.isNotEmpty) {
+          // Announce surah name in Arabic if enabled
+          if (_announceSurah && surahArabic.isNotEmpty) {
             if (mounted) setState(() => _phase = 'announcing');
-            // Announce in Arabic: "سورة الفاتحة"
-            final arabicName = surahEnglish.replaceAll(RegExp(r'[()]'), '');
-            await _speak('سورة $arabicName', 'ar');
+            await _speak(surahArabic, 'ar');
             if (_stopFlag) break;
           }
         }
         if (_stopFlag) break;
 
-        // Announce verse number
-        if (_announceSurah) {
+        // Announce verse number only if "announce each verse" is checked
+        if (_announceSurah && _announceEachVerse) {
           final lang = _lang == 'French' ? 'fr' : 'en';
           final prefix = lang == 'fr' ? 'Verset' : 'Verse';
-          await _speak('$prefix $verse', lang, gender: _ttsVoiceGender);
+          await _speak('$prefix $verse', lang);
           if (_stopFlag) break;
         }
 
@@ -894,7 +902,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
           // Speak translation aloud
           if (_speakTranslation && trText.isNotEmpty && !_stopFlag) {
             final trLang = _lang == 'French' ? 'fr' : 'en';
-            await _speak(trText, trLang, gender: _ttsVoiceGender);
+            await _speak(trText, trLang);
             if (_stopFlag) break;
           }
         } else {
@@ -973,7 +981,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
       await _runSequence(seq,
           repeats: _infiniteLoop ? 999 : _repeatCount,
           infinite: _infiniteLoop,
-          withTranslation: true);
+          withTranslation: _translateAfter);
     } catch (e) {
       if (mounted) setState(() => _error = 'Erreur: $e');
     }
@@ -1145,14 +1153,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     children: [
                       ChoiceChip(
                         label: const Text('Feminin'),
-                        selected: _ttsVoiceGender == 'female',
-                        onSelected: (v) => setState(() => _ttsVoiceGender = 'female'),
+                        selected: _ttsFemaleVoice,
+                        onSelected: (v) => setState(() => _ttsFemaleVoice = v),
                       ),
                       const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('Masculin'),
-                        selected: _ttsVoiceGender == 'male',
-                        onSelected: (v) => setState(() => _ttsVoiceGender = 'male'),
+                        selected: !_ttsFemaleVoice,
+                        onSelected: (v) => setState(() => _ttsFemaleVoice = !v),
                       ),
                     ],
                   ),

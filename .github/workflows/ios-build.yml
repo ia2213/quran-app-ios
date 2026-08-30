@@ -4,12 +4,17 @@ on:
   push:
     branches: [main, master]
   workflow_dispatch:
+    inputs:
+      altstore_url:
+        description: 'AltStore API URL (optional)'
+        required: false
+        default: ''
 
 jobs:
   build-ios:
-    name: Build iOS Device IPA
-    runs-on: macos-latest
-    timeout-minutes: 60
+    name: Build iOS IPA
+    runs-on: macos-15
+    timeout-minutes: 30
     
     steps:
       - name: Checkout repository
@@ -18,72 +23,74 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.1'
+          flutter-version: '3.27.4'
           channel: 'stable'
           cache: true
+      
+      - name: Flutter doctor
+        run: flutter doctor -v
       
       - name: Get dependencies
         run: flutter pub get
       
-      - name: Build iOS project info
-        run: |
-          flutter doctor -v
-          echo "Flutter version: $(flutter --version | head -1)"
+      - name: Build iOS (no codesign for sideloading)
+        run: flutter build ios --release --no-codesign
       
-      - name: Build iOS release (no codesign for sideloading)
+      - name: Package IPA
         run: |
-          # Build for release but skip code signing (for sideloading via AltStore/SideStore)
-          flutter build ios --release --no-codesign
-          echo "Build complete"
-      
-      - name: Create IPA from built app
-        run: |
-          # Find the .app built (Flutter 3.x outputs to iphoneos or Release-iphoneos)
-          APP_DIR=$(find build/ios -name "*.app" -type d | head -1)
+          echo "=== Packaging IPA ==="
+          
+          # Find the .app bundle
+          APP_DIR=$(find build/ios/iphoneos -name "*.app" -type d | head -1)
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: No .app found in build/ios/iphoneos"
+            find build/ios -name "*.app" 2>/dev/null
+            exit 1
+          fi
+          
           echo "Found app: $APP_DIR"
-
-          if [ -n "$APP_DIR" ]; then
-            # Create Payload directory and copy .app into it
-            mkdir -p Payload
-            cp -r "$(basename "$APP_DIR")" Payload/
-
-            # Zip it to create IPA (IPA is just a zip with Payload/)
-            zip -r quran-app-ios.ipa Payload
-            rm -rf Payload
-
-            echo "Created IPA: $(pwd)/quran-app-ios.ipa"
-            ls -lh quran-app-ios.ipa
-          else
-            echo "ERROR: No .app found"
-            find build/ios -name "*.app" 2>/dev/null | head -5
-            exit 1
-          fi
-      
-      - name: Verify IPA
-        run: |
-          if [ -f "quran-app-ios.ipa" ]; then
-            echo "IPA exists: $(ls -lh quran-app-ios.ipa)"
-            # Check it's a valid zip
-            if file quran-app-ios.ipa | grep -q "ZIP"; then
-              echo "IPA is a valid ZIP file"
-            fi
-          else
-            echo "ERROR: IPA was not created"
-            exit 1
-          fi
+          APP_NAME=$(basename "$APP_DIR")
+          
+          # Create IPA structure
+          mkdir -p Payload
+          cp -r "$APP_DIR" Payload/
+          
+          # Create IPA (zip)
+          zip -r -y quran-app.ipa Payload
+          rm -rf Payload
+          
+          echo "IPA created:"
+          ls -lh quran-app.ipa
+          
+          # Verify
+          unzip -l quran-app.ipa | head -5
       
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: quran-app-ios-ipa
-          path: quran-app-ios.ipa
+          name: quran-app-ios
+          path: quran-app.ipa
           retention-days: 30
           if-no-files-found: error
       
-      - name: Summary
+      - name: Print AltStore install instructions
         run: |
-          echo "## Build Complete" >> $GITHUB_STEP_SUMMARY
-          echo "- **App**: Quran App (iOS)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Build type**: Release (no codesign)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Install method**: AltStore / SideStore / Sideloadly" >> $GITHUB_STEP_SUMMARY
-          echo "- **Apple ID required**: Your free personal Apple ID" >> $GITHUB_STEP_SUMMARY
+          echo "## 📱 AltStore Installation Instructions" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Option 1: AltServer (Recommended)" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the IPA from the Artifacts section above" >> $GITHUB_STEP_SUMMARY
+          echo "2. Open AltStore on your iPhone" >> $GITHUB_STEP_SUMMARY
+          echo "3. Connect iPhone to Mac/PC" >> $GITHUB_STEP_SUMMARY
+          echo "4. In AltStore, tap '+' → select the IPA file" >> $GITHUB_STEP_SUMMARY
+          echo "5. Sign with your Apple ID (free account works)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Option 2: Sideloadly" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the IPA" >> $GITHUB_STEP_SUMMARY
+          echo "2. Open Sideloadly" >> $GITHUB_STEP_SUMMARY
+          echo "3. Connect iPhone → drag IPA into Sideloadly" >> $GITHUB_STEP_SUMMARY
+          echo "4. Click Start to install" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Option 3: AltStore via iCloud" >> $GITHUB_STEP_SUMMARY
+          echo "1. Download the IPA from Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "2. Open AltStore on iPhone" >> $GITHUB_STEP_SUMMARY
+          echo "3. My Apps → + → Import File → select IPA" >> $GITHUB_STEP_SUMMARY

@@ -129,8 +129,8 @@ class TTSServer(BaseHTTPRequestHandler):
 
 
 def run_server(port=8766):
-    server = HTTPServer(('127.0.0.1', port), TTSServer)
-    print(f"TTS server running on http://127.0.0.1:{port}/tts")
+    server = HTTPServer(('0.0.0.0', port), TTSServer)
+    print(f"TTS server running on http://0.0.0.0:{port}/tts")
     server.serve_forever()
 
 
