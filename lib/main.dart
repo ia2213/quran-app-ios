@@ -655,20 +655,25 @@ class _RecitationScreenState extends State<RecitationScreen> {
   }
 
   Future<void> _initAudioSession() async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.speech());
-    session.interruptionEventStream.listen((event) {
-      debugPrint('Audio interruption: ${event.type}');
-      if (event.begin) {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      session.interruptionEventStream.listen((event) {
+        debugPrint('Audio interruption: ${event.type}');
+        if (event.begin) {
+          _player.pause();
+        } else {
+          _player.play();
+        }
+      });
+      session.becomingNoisyEventStream.listen((_) {
+        debugPrint('Headphones disconnected');
         _player.pause();
-      } else {
-        _player.play();
-      }
-    });
-    session.becomingNoisyEventStream.listen((_) {
-      debugPrint('Headphones disconnected');
-      _player.pause();
-    });
+      });
+      debugPrint('Audio session configured: music');
+    } catch (e) {
+      debugPrint('Audio session init error: $e');
+    }
   }
 
   @override
@@ -767,6 +772,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
       }
     } catch (e) {
       debugPrint('TTS error: $e');
+      if (mounted) setState(() => _error = 'Erreur TTS: $e');
     }
     if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
   }
@@ -1269,6 +1275,39 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     child: Center(
                         child: Text('⏹ Arrêter', style: TextStyle(color: Colors.white, fontSize: 16))),
                   ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Test audio button — isolate audio problems
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700),
+                onPressed: () async {
+                  setState(() { _error = null; });
+                  try {
+                    debugPrint('TEST: Starting audio test...');
+                    final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=ar-SA&client=tw-ob&q=salam';
+                    await _player.stop();
+                    await _player.setUrl(url);
+                    debugPrint('TEST: URL loaded, starting play...');
+                    await _player.play();
+                    debugPrint('TEST: Play returned successfully');
+                    await Future.delayed(const Duration(seconds: 3));
+                    if (_player.playing) {
+                      debugPrint('TEST: Audio is playing!');
+                      if (mounted) setState(() => _error = 'Audio OK — la lecture fonctionne!');
+                    } else {
+                      debugPrint('TEST: Player stopped but never played. State: ${_player.processingState}');
+                      if (mounted) setState(() => _error = 'Audio stopped immediately. Vérifiez le volume et le mode silence.');
+                    }
+                    await _player.stop();
+                  } catch (e) {
+                    debugPrint('TEST error: $e');
+                    if (mounted) setState(() => _error = 'Erreur test audio: $e');
+                  }
+                },
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(child: Text('🔊 TEST AUDIO (salam)', style: TextStyle(color: Colors.white, fontSize: 14))),
                 ),
               ),
             ],
