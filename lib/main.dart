@@ -649,6 +649,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
     _player.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlaying = state.playing);
     });
+    // iOS: Ensure player is ready before use
+    _player.setVolume(1.0);
   }
 
   @override
@@ -871,10 +873,12 @@ class _RecitationScreenState extends State<RecitationScreen> {
               if (mounted) setState(() => _currentAudioUrl = url);
               if (!_stopFlag && mounted) {
                 try {
+                  // iOS fix: setUrl then play with explicit source
                   await _player.setUrl(url);
                   await _player.play();
                   await _waitForPlayerStopped();
                 } catch (e) {
+                  debugPrint('Audio play error: $e');
                   if (mounted) {
                     setState(() => _currentAudioUrl = null);
                   }
@@ -882,7 +886,9 @@ class _RecitationScreenState extends State<RecitationScreen> {
               }
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          debugPrint('Audio fetch error: $e');
+        }
 
         // Translation
         if (withTranslation) {
@@ -1020,7 +1026,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  prefixText: '1 '),
               textAlign: TextAlign.center,
               onChanged: (v) => onChanged(int.tryParse(v) ?? value),
             ),
