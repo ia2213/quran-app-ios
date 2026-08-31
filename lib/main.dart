@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
+import 'package:audio_session/audio_session.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
@@ -646,11 +647,28 @@ class _RecitationScreenState extends State<RecitationScreen> {
   @override
   void initState() {
     super.initState();
+    _initAudioSession();
     _player.playerStateStream.listen((state) {
       if (mounted) setState(() => _isPlaying = state.playing);
     });
-    // iOS: Ensure player is ready before use
     _player.setVolume(1.0);
+  }
+
+  Future<void> _initAudioSession() async {
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.speech());
+    session.interruptionEventStream.listen((event) {
+      debugPrint('Audio interruption: ${event.type}');
+      if (event.begin) {
+        _player.pause();
+      } else {
+        _player.play();
+      }
+    });
+    session.becomingNoisyEventStream.listen((_) {
+      debugPrint('Headphones disconnected');
+      _player.pause();
+    });
   }
 
   @override
@@ -1027,8 +1045,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
               decoration: const InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
                   contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  prefixText: '1 '),
+                  hintText: '1'),
               textAlign: TextAlign.center,
+              onTap: () {
+                ctrl.selection = TextSelection(baseOffset: 0, extentOffset: ctrl.text.length);
+              },
               onChanged: (v) => onChanged(int.tryParse(v) ?? value),
             ),
           ),
