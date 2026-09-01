@@ -13,7 +13,6 @@ void main() => runApp(const QuranApp());
 // ============================================================
 
 const kBase = 'https://api.alquran.cloud/v1';
-const kTotalPages = 604;
 
 const kReciters = [
   {'id': 'ar.alafasy',      'label': 'Mishary Rashid Al-Afasy'},
@@ -63,74 +62,19 @@ const kAyahCounts = [
 ];
 
 // ============================================================
-// MODELS
-// ============================================================
-
-class AyahData {
-  final int globalNumber;
-  final int surahNumber;
-  final int numberInSurah;
-  final String textAr;
-  final String? textFr;
-  final String? audioUrl;
-  final int page;
-  final int juz;
-  AyahData({required this.globalNumber, required this.surahNumber, required this.numberInSurah,
-            required this.textAr, this.textFr, this.audioUrl, required this.page, required this.juz});
-}
-
-class StudyProgress {
-  final int ayahGlobalNumber;
-  final int surahNumber;
-  final int verseNumber;
-  final double easeFactor;
-  final DateTime nextReview;
-  final int interval;
-  final int repetitions;
-  StudyProgress({required this.ayahGlobalNumber, required this.surahNumber,
-                 required this.verseNumber, this.easeFactor = 2.5,
-                 required this.nextReview, this.interval = 0, this.repetitions = 0});
-  Map<String, dynamic> toJson() => {
-    'ayahGlobalNumber': ayahGlobalNumber, 'surahNumber': surahNumber,
-    'verseNumber': verseNumber, 'easeFactor': easeFactor,
-    'nextReview': nextReview.toIso8601String(),
-    'interval': interval, 'repetitions': repetitions,
-  };
-  factory StudyProgress.fromJson(Map<String, dynamic> j) => StudyProgress(
-    ayahGlobalNumber: j['ayahGlobalNumber'], surahNumber: j['surahNumber'],
-    verseNumber: j['verseNumber'], easeFactor: j['easeFactor']?.toDouble() ?? 2.5,
-    nextReview: DateTime.parse(j['nextReview']),
-    interval: j['interval'] ?? 0, repetitions: j['repetitions'] ?? 0,
-  );
-}
-
-// ============================================================
 // APP STATE
 // ============================================================
 
 class AppState extends ChangeNotifier {
   final List<Map<String, dynamic>> _surahs = [];
   bool _surahLoading = false;
-  final List<AyahData> _ayahs = [];
-  bool _ayahLoading = false;
-  String? _ayahError;
   String _reciter = 'ar.alafasy';
   String _translationLang = 'fr';
-  bool _showTranslation = true;
-  bool _showTransliteration = false;
-  final Map<String, StudyProgress> _studyProgress = {};
 
   List<Map<String, dynamic>> get surahs => _surahs;
-  List<AyahData> get ayahs => _ayahs;
   bool get surahLoading => _surahLoading;
-  bool get ayahLoading => _ayahLoading;
-  String? get ayahError => _ayahError;
   String get reciter => _reciter;
   String get translationLang => _translationLang;
-  bool get showTranslation => _showTranslation;
-  bool get showTransliteration => _showTransliteration;
-  int get totalStudied => _studyProgress.length;
-  int get dueCount => _studyProgress.values.where((p) => p.nextReview.isBefore(DateTime.now())).length;
 
   Future<void> loadSurahs() async {
     _surahLoading = true;
@@ -145,9 +89,7 @@ class AppState extends ChangeNotifier {
             'number': s['number'],
             'name': s['name'],
             'englishName': s['englishName'],
-            'englishNameTranslation': s['englishNameTranslation'],
             'numberOfAyahs': s['numberOfAyahs'],
-            'revelationType': s['revelationType'],
           });
         }
       }
@@ -158,133 +100,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadAyahs(int surahNumber) async {
-    _ayahLoading = true;
-    _ayahError = null;
-    notifyListeners();
-    try {
-      final arR = await http.get(Uri.parse('$kBase/surah/$surahNumber/${_reciter}'));
-      if (arR.statusCode != 200) throw Exception('Failed to load ayahs');
-      final arD = json.decode(arR.body) as Map<String, dynamic>;
-
-      final trId = _translationLang == 'fr' ? 'fr.hamidullah' : 'en.sahih';
-      final trR = await http.get(Uri.parse('$kBase/surah/$surahNumber/$trId'));
-      final Map<int, String> translations = {};
-      if (trR.statusCode == 200) {
-        final trD = json.decode(trR.body) as Map<String, dynamic>;
-        for (var a in trD['data']['ayahs'] as List) {
-          translations[a['numberInSurah'] as int] = a['text'] as String;
-        }
-      }
-
-      _ayahs.clear();
-      for (var a in arD['data']['ayahs'] as List) {
-        final num = a['numberInSurah'] as int;
-        _ayahs.add(AyahData(
-          globalNumber: a['number'] as int,
-          surahNumber: surahNumber,
-          numberInSurah: num,
-          textAr: a['text'] as String,
-          textFr: translations[num] ?? '',
-          audioUrl: a['audio'] as String?,
-          page: a['page'] as int? ?? 0,
-          juz: a['juz'] as int? ?? 0,
-        ));
-      }
-    } catch (e) {
-      _ayahError = 'Error: $e';
-    }
-    _ayahLoading = false;
-    notifyListeners();
-  }
-
-  Future<void> loadPageAyahs(int pageNum) async {
-    _ayahLoading = true;
-    _ayahError = null;
-    notifyListeners();
-    try {
-      final arR = await http.get(Uri.parse('$kBase/page/$pageNum/quran-uthmani'));
-      if (arR.statusCode != 200) throw Exception('Failed to load page');
-      final arD = json.decode(arR.body) as Map<String, dynamic>;
-
-      final trId = _translationLang == 'fr' ? 'fr.hamidullah' : 'en.sahih';
-      final trR = await http.get(Uri.parse('$kBase/page/$pageNum/$trId'));
-      final Map<int, String> translations = {};
-      if (trR.statusCode == 200) {
-        final trD = json.decode(trR.body) as Map<String, dynamic>;
-        for (var a in trD['data']['ayahs'] as List) {
-          translations[a['numberInSurah'] as int] = a['text'] as String;
-        }
-      }
-
-      _ayahs.clear();
-      for (var a in arD['data']['ayahs'] as List) {
-        final s = a['surah'] as Map<String, dynamic>;
-        final num = a['numberInSurah'] as int;
-        _ayahs.add(AyahData(
-          globalNumber: a['number'] as int,
-          surahNumber: s['number'] as int,
-          numberInSurah: num,
-          textAr: a['text'] as String,
-          textFr: translations[num] ?? '',
-          audioUrl: null,
-          page: pageNum,
-          juz: a['juz'] as int? ?? 0,
-        ));
-      }
-    } catch (e) {
-      _ayahError = 'Error: $e';
-    }
-    _ayahLoading = false;
-    notifyListeners();
-  }
-
   void setReciter(String id) { _reciter = id; notifyListeners(); }
   void setTranslationLang(String lang) { _translationLang = lang; notifyListeners(); }
-  void toggleTranslation() { _showTranslation = !_showTranslation; notifyListeners(); }
-  void toggleTransliteration() { _showTransliteration = !_showTransliteration; notifyListeners(); }
-
-  Future<void> loadStudyProgress() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getString('study_progress');
-      if (data != null) {
-        final jm = json.decode(data) as Map<String, dynamic>;
-        _studyProgress.clear();
-        jm.forEach((k, v) => _studyProgress[k] = StudyProgress.fromJson(v as Map<String, dynamic>));
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error loading study: $e');
-    }
-  }
-
-  Future<void> saveStudyProgress(StudyProgress p) async {
-    final prefs = await SharedPreferences.getInstance();
-    _studyProgress['${p.ayahGlobalNumber}'] = p;
-    final jm = _studyProgress.map((k, v) => MapEntry(k, v.toJson()));
-    await prefs.setString('study_progress', jsonEncode(jm));
-    notifyListeners();
-  }
-
-  void resetStudyProgress() async {
-    _studyProgress.clear();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('study_progress');
-    notifyListeners();
-  }
-
-  List<StudyProgress> getDueAyahs() =>
-      _studyProgress.values.where((p) => p.nextReview.isBefore(DateTime.now())).toList()
-        ..sort((a, b) => a.nextReview.compareTo(b.nextReview));
-
-  AyahData? getAyahByGlobalNumber(int n) {
-    try { return _ayahs.firstWhere((a) => a.globalNumber == n); } catch (_) { return null; }
-  }
-
-  Map<String, dynamic>? getSurah(int n) {
-    try { return _surahs.firstWhere((s) => s['number'] == n); } catch (_) { return null; }
-  }
 }
 
 // ============================================================
@@ -296,9 +113,9 @@ class QuranApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AppState()..loadSurahs()..loadStudyProgress(),
+      create: (_) => AppState()..loadSurahs(),
       child: MaterialApp(
-        title: 'Quran Learning',
+        title: 'Lecture du Coran',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
@@ -307,294 +124,15 @@ class QuranApp extends StatelessWidget {
           scaffoldBackgroundColor: const Color(0xFFF5F5F5),
         ),
         darkTheme: ThemeData.dark(useMaterial3: true),
-        themeMode: ThemeMode.system,
-        home: const MainScreen(),
+        themeMode: ThemeMode.dark,
+        home: const RecitationScreen(),
       ),
     );
   }
 }
 
-class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  int _idx = 0;
-  late final List<Widget> _pages;
-  @override
-  void initState() {
-    super.initState();
-    _pages = [const RecitationScreen(), const StudyScreenMain(), const SurahListScreen()];
-  }
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    body: _pages[_idx],
-    bottomNavigationBar: BottomNavigationBar(
-      currentIndex: _idx, type: BottomNavigationBarType.fixed,
-      selectedItemColor: const Color(0xFF1B5E20), unselectedItemColor: Colors.grey,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.music_note), label: 'Récitation'),
-        BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Étude'),
-        BottomNavigationBarItem(icon: Icon(Icons.list), label: 'Sourates'),
-      ],
-      onTap: (i) => setState(() => _idx = i),
-    ),
-  );
-}
-
 // ============================================================
-// SURAH LIST
-// ============================================================
-
-class SurahListScreen extends StatelessWidget {
-  const SurahListScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    return Scaffold(
-      appBar: AppBar(title: const Text('Sourates')),
-      body: state.surahLoading && state.surahs.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : state.surahs.isEmpty
-              ? const Center(child: Text('No surahs loaded'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: state.surahs.length,
-                  itemBuilder: (context, i) {
-                    final s = state.surahs[i];
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFF1B5E20),
-                          child: Text(s['number'].toString(),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        ),
-                        title: Text(s['englishName']),
-                        subtitle: Text('${s['numberOfAyahs']} Ayahs · ${s['revelationType']}'),
-                        trailing: Text(s['name'], style: const TextStyle(fontSize: 18, fontFamily: 'Amiri')),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => SurahDetailScreen(surahNumber: s['number']),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-    );
-  }
-}
-
-// ============================================================
-// SURAH DETAIL
-// ============================================================
-
-class SurahDetailScreen extends StatefulWidget {
-  final int surahNumber;
-  const SurahDetailScreen({super.key, required this.surahNumber});
-  @override
-  State<SurahDetailScreen> createState() => _SurahDetailScreenState();
-}
-
-class _SurahDetailScreenState extends State<SurahDetailScreen> {
-  late final AppState _state;
-
-  @override
-  void initState() {
-    super.initState();
-    _state = context.read<AppState>();
-    _state.loadAyahs(widget.surahNumber);
-  }
-
-  Future<String?> _fetchTranslit(int surah, int ayah) async {
-    try {
-      final r = await http.get(Uri.parse('$kBase/edition/type/transliteration'));
-      if (r.statusCode != 200) return null;
-      final d = json.decode(r.body) as Map<String, dynamic>;
-      var eds = d['data'] as List;
-      String? tid = eds.where((e) => (e as Map)['identifier'] == 'en.transliteration').isNotEmpty
-          ? 'en.transliteration'
-          : (eds.isNotEmpty ? eds.first['identifier'] as String : null);
-      if (tid == null) return null;
-      final r2 = await http.get(Uri.parse('$kBase/ayah/$surah:$ayah/$tid'));
-      if (r2.statusCode == 200) {
-        final d2 = json.decode(r2.body) as Map<String, dynamic>;
-        return d2['data']['text'] as String?;
-      }
-    } catch (e) {}
-    return null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final surah = state.getSurah(widget.surahNumber);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(surah?['englishName'] ?? 'Surah ${widget.surahNumber}'),
-        actions: [
-          IconButton(
-            icon: Icon(state.showTranslation ? Icons.translate : Icons.translate_outlined),
-            onPressed: state.toggleTranslation,
-          ),
-          IconButton(
-            icon: Icon(state.showTransliteration ? Icons.language : Icons.language_outlined),
-            onPressed: state.toggleTransliteration,
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.mic),
-            tooltip: 'Récitateur',
-            onSelected: (v) {
-              state.setReciter(v);
-              state.loadAyahs(widget.surahNumber);
-            },
-            itemBuilder: (_) => kReciters
-                .map((r) => PopupMenuItem<String>(
-                      value: r['id'] as String,
-                      child: Text(r['label'] as String),
-                    ))
-                .toList(),
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.translate),
-            tooltip: 'Traduction',
-            onSelected: (v) {
-              state.setTranslationLang(v == 'fr' ? 'fr' : 'en');
-              state.loadAyahs(widget.surahNumber);
-            },
-            itemBuilder: (_) => const [
-              PopupMenuItem<String>(value: 'fr', child: Text('Français (Hamidullah)')),
-              PopupMenuItem<String>(value: 'en', child: Text('English (Sahih Intl.)')),
-            ],
-          ),
-        ],
-      ),
-      body: state.ayahLoading
-          ? const Center(child: CircularProgressIndicator())
-          : state.ayahError != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(state.ayahError!, style: const TextStyle(color: Colors.red)),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => state.loadAyahs(widget.surahNumber),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: state.ayahs.length,
-                  itemBuilder: (context, i) {
-                    final a = state.ayahs[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 4, offset: const Offset(0, 2))
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: const BoxDecoration(
-                                          color: Color(0xFF1B5E20), shape: BoxShape.circle),
-                                      child: Center(
-                                        child: Text('${a.numberInSurah}',
-                                            style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12)),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text('Ayah ${a.numberInSurah}',
-                                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                                Row(
-                                  children: [
-                                    if (a.juz > 0)
-                                      Chip(
-                                          label: Text('Juz ${a.juz}'),
-                                          padding: EdgeInsets.zero,
-                                          labelStyle: const TextStyle(fontSize: 11)),
-                                    const SizedBox(width: 8),
-                                    if (a.audioUrl != null)
-                                      IconButton(
-                                        icon: const Icon(Icons.play_circle),
-                                        color: Colors.green,
-                                        onPressed: () {
-                                          // Open audio in system browser
-                                          // (no audio player dependency needed)
-                                        },
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Text(a.textAr,
-                                style: const TextStyle(fontSize: 28, fontFamily: 'Amiri', height: 2),
-                                textAlign: TextAlign.right),
-                            if (state.showTransliteration) ...[
-                              const SizedBox(height: 8),
-                              FutureBuilder<String?>(
-                                future: _fetchTranslit(widget.surahNumber, a.numberInSurah),
-                                builder: (ctx, snap) => snap.data != null && snap.data!.isNotEmpty
-                                    ? Text(snap.data!,
-                                        style: TextStyle(
-                                            color: Colors.grey[700],
-                                            fontSize: 14,
-                                            fontStyle: FontStyle.italic))
-                                    : const SizedBox.shrink(),
-                              ),
-                            ],
-                            if (state.showTranslation &&
-                                a.textFr != null &&
-                                a.textFr!.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: Text(a.textFr!, style: const TextStyle(fontSize: 15)),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-    );
-  }
-}
-
-// ============================================================
-// RECITATION SCREEN (VersePlayer)
+// RECITATION SCREEN
 // ============================================================
 
 class RecitationScreen extends StatefulWidget {
@@ -603,22 +141,30 @@ class RecitationScreen extends StatefulWidget {
   State<RecitationScreen> createState() => _RecitationScreenState();
 }
 
-class _RecitationScreenState extends State<RecitationScreen> {
-  String _mode = 'range';
+class _RecitationScreenState extends State<RecitationScreen> with SingleTickerProviderStateMixin {
+  // Mode: range, page, single, loop
+  String _mode = 'single';
+  
+  // Range mode
   int _startSurah = 1, _startVerse = 1, _endSurah = 1, _endVerse = 7;
   int _pageNumber = 1;
+  
+  // Single mode
   int _singleSurah = 1, _singleVerse = 1;
-  bool _translateAfter = true;
-  String _lang = 'French';
-  String _reciter = 'ar.alafasy';
-  int _repeatCount = 3;
-  bool _infiniteLoop = false;
-  bool _announceEachVerse = false;
-  bool _showTransliteration = false;
+  
+  // Options
+  bool _announceSurahVerse = true;    // "Sourate X, verset Y"
+  bool _announceVerseOnly = false;    // Just "Verset Y" (optional separate)
   bool _speakTranslation = true;
-  bool _announceSurah = true;
-  bool _ttsFemaleVoice = false; // false = masculine, true = feminine (if available)
-
+  bool _speakRecitation = true;
+  bool _infiniteLoop = false;
+  bool _showTransliteration = false;
+  int _repeatCount = 1;
+  bool _ttsFemaleVoice = false;
+  String _lang = 'fr';
+  String _reciter = 'ar.alafasy';
+  
+  // State
   String _phase = 'idle';
   String? _currentSurahName;
   int? _currentVerseNum;
@@ -631,11 +177,13 @@ class _RecitationScreenState extends State<RecitationScreen> {
   String? _error;
   bool _isRunning = false;
   bool _stopFlag = false;
+  
   final _player = AudioPlayer();
   String? _currentAudioUrl;
   bool _isPlaying = false;
   bool _isTtsPlaying = false;
   bool _isTtsBuffering = false;
+  
   late final TextEditingController _startSurahCtrl = TextEditingController(text: '1');
   late final TextEditingController _startVerseCtrl = TextEditingController(text: '1');
   late final TextEditingController _endSurahCtrl = TextEditingController(text: '1');
@@ -643,6 +191,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
   late final TextEditingController _pageNumberCtrl = TextEditingController(text: '1');
   late final TextEditingController _singleSurahCtrl = TextEditingController(text: '1');
   late final TextEditingController _singleVerseCtrl = TextEditingController(text: '1');
+  
+  // Google TTS cache
+  final Map<String, String> _ttsUrlCache = {};
+  DateTime? _lastTtsRequest;
 
   @override
   void initState() {
@@ -679,6 +231,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
   @override
   void dispose() {
     _stopFlag = true;
+    _player.stop();
     _player.dispose();
     _startSurahCtrl.dispose();
     _startVerseCtrl.dispose();
@@ -702,19 +255,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
     }
   }
 
-  // Google TTS cache
-  final Map<String, String> _ttsUrlCache = {};
-  DateTime? _lastTtsRequest;
-
   // Build Google TTS URL with client signature for male/female voices
   String _buildGoogleTtsUrl(String text, String lang, bool female) {
-    // Remove parentheses
     final clean = text.replaceAll(RegExp(r'[()]'), '');
-    // URL encode
     final encoded = Uri.encodeComponent(clean);
-    // Different strategies: Arabic uses client param, French uses different client params
     final client = lang == 'ar' ? (female ? 'gws-xsn-dev' : 'tw-ob') : (female ? 'lemon' : 'tw-ob');
-    // Slower rate for clarity
     final tl = lang == 'ar' ? 'ar-SA' : (lang == 'en' ? 'en-US' : 'fr-FR');
     return 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=$client&q=$encoded';
   }
@@ -722,10 +267,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
   Future<String?> _getCachedTtsUrl(String text, String lang, bool female) async {
     if (text.isEmpty) return null;
     final url = _buildGoogleTtsUrl(text, lang, female);
-    // Check cache (search by key, not value)
     if (_ttsUrlCache.containsKey(url)) return url;
     _ttsUrlCache[url] = text;
-    // Limit cache size
     if (_ttsUrlCache.length > 50) {
       final first = _ttsUrlCache.keys.first;
       _ttsUrlCache.remove(first);
@@ -736,7 +279,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
   Future<void> _speak(String text, String lang) async {
     if (text.isEmpty || _stopFlag) return;
     try {
-      // Rate limit: prevent spamming Google TTS
       if (_lastTtsRequest != null) {
         final elapsed = DateTime.now().difference(_lastTtsRequest!);
         if (elapsed.inMilliseconds < 500) {
@@ -753,11 +295,9 @@ class _RecitationScreenState extends State<RecitationScreen> {
       await _player.setUrl(url);
       if (mounted) setState(() { _isTtsPlaying = true; _isTtsBuffering = false; });
       await _player.play();
-      // FIX: Wait for actual audio completion by checking player state, NOT _isTtsPlaying
-      // (which is never set to false by playerStateStream — was causing 60s hangs)
+      
       int attempts = 0;
       while (!_stopFlag && attempts < 150) {
-        // If player is no longer playing, we're done
         if (!_player.playing) {
           final ps = _player.processingState;
           if (ps == ProcessingState.completed || ps == ProcessingState.idle) break;
@@ -765,7 +305,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         await Future.delayed(const Duration(milliseconds: 300));
         attempts++;
       }
-      // Force stop if still stuck (45s max)
       if (_isTtsPlaying) {
         await _player.stop();
         if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
@@ -777,29 +316,27 @@ class _RecitationScreenState extends State<RecitationScreen> {
     if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
   }
 
-  // Wait for audio to finish playing (handles all player states correctly)
   Future<void> _waitForPlayerStopped() async {
     for (int i = 0; i < 120; i++) {
       if (_stopFlag) return;
       final ps = _player.processingState;
-      // Terminal states: audio completed or errored
       if (ps == ProcessingState.completed || ps == ProcessingState.idle) return;
-      // Player is buffering/loading — wait for it to start
       if (!_player.playing) {
         await Future.delayed(const Duration(milliseconds: 500));
         continue;
       }
-      // Player is playing — keep waiting until it stops
       await Future.delayed(const Duration(milliseconds: 300));
     }
   }
 
   Future<void> _runSequence(List<Map<String, int>> seq,
-      {int repeats = 3, bool infinite = false, bool withTranslation = true}) async {
+      {int repeats = 3, bool infinite = false, bool withTranslation = true, bool withRecitation = true}) async {
     _stopFlag = false;
     _isRunning = true;
     int done = 0;
     int rep = 0;
+    String? cachedSurahName;
+    int? cachedSurahNum;
 
     while (!_stopFlag && (infinite || rep < repeats)) {
       rep++;
@@ -811,50 +348,56 @@ class _RecitationScreenState extends State<RecitationScreen> {
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        if (mounted) {
-          setState(() {
-            _currentVerseNum = verse;
-            _phase = 'announcing';
-          });
-        }
-
-        // Announce surah name
-        if (surah != lastSurah || _announceEachVerse) {
-          String surahEnglish = '';
-          String surahArabic = '';
-          try {
-            final r = await http.get(Uri.parse('$kBase/surah/$surah'));
-            if (r.statusCode == 200) {
-              final d = json.decode(r.body) as Map<String, dynamic>;
-              surahArabic = d['data']['name'] as String;
-              surahEnglish = d['data']['englishName'] as String;
-              if (mounted) {
-                setState(() {
-                  _currentSurahName = '$surah · $surahEnglish ($surahArabic)';
-                });
+        // Announce surah when changing surah
+        if (surah != lastSurah) {
+          String surahName = cachedSurahName ?? '';
+          if (surah != cachedSurahNum) {
+            try {
+              final r = await http.get(Uri.parse('$kBase/surah/$surah'));
+              if (r.statusCode == 200) {
+                final d = json.decode(r.body) as Map<String, dynamic>;
+                surahName = d['data']['name'] as String;
+                cachedSurahName = surahName;
+                cachedSurahNum = surah;
               }
-            }
-          } catch (e) {}
+            } catch (e) {}
+          }
+          
           lastSurah = surah;
-          // Announce surah name in Arabic if enabled
-          if (_announceSurah && surahArabic.isNotEmpty) {
-            if (mounted) setState(() => _phase = 'announcing');
-            await _speak(surahArabic, 'ar');
+          
+          // Announce: "Sourate X, verset Y"
+          if (_announceSurahVerse && surahName.isNotEmpty) {
+            if (mounted) {
+              setState(() {
+                _currentSurahName = surahName;
+                _currentVerseNum = verse;
+                _phase = 'announcing';
+              });
+            }
+            // Speak: "Sourate [name], verset [number]"
+            final announceText = _lang == 'fr' 
+                ? 'Sourate $surahName, verset $verse'
+                : 'Surah $surahName, verse $verse';
+            await _speak(announceText, _lang);
+            if (_stopFlag) break;
+          }
+          
+          // Optional separate "Verset Y" announcement
+          if (_announceVerseOnly && !_announceSurahVerse) {
+            final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
+            await _speak(verseText, _lang);
             if (_stopFlag) break;
           }
         }
-        if (_stopFlag) break;
 
-        // Announce verse number only if "announce each verse" is checked
-        if (_announceSurah && _announceEachVerse) {
-          final lang = _lang == 'French' ? 'fr' : 'en';
-          final prefix = lang == 'fr' ? 'Verset' : 'Verse';
-          await _speak('$prefix $verse', lang);
-          if (_stopFlag) break;
+        if (mounted) {
+          setState(() {
+            _currentVerseNum = verse;
+            _phase = 'reciting';
+          });
         }
 
         // Fetch arabic text
-        if (mounted) setState(() => _phase = 'reciting');
         try {
           final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/quran-uthmani'));
           if (r.statusCode == 200) {
@@ -868,13 +411,19 @@ class _RecitationScreenState extends State<RecitationScreen> {
         // Transliteration
         if (_showTransliteration) {
           try {
-            final tid = await _getTranslitId();
-            if (tid != null) {
-              final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$tid'));
-              if (r.statusCode == 200) {
-                final d = json.decode(r.body) as Map<String, dynamic>;
-                if (mounted)
-                  setState(() => _transliterationText = d['data']['text'] as String? ?? '');
+            final r = await http.get(Uri.parse('$kBase/edition/type/transliteration'));
+            if (r.statusCode == 200) {
+              final d = json.decode(r.body) as Map<String, dynamic>;
+              var eds = d['data'] as List;
+              String? tid = eds.where((e) => (e as Map)['identifier'] == 'en.transliteration').isNotEmpty
+                  ? 'en.transliteration'
+                  : (eds.isNotEmpty ? eds.first['identifier'] as String : null);
+              if (tid != null) {
+                final r2 = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$tid'));
+                if (r2.statusCode == 200) {
+                  final d2 = json.decode(r2.body) as Map<String, dynamic>;
+                  if (mounted) setState(() => _transliterationText = d2['data']['text'] as String? ?? '');
+                }
               }
             }
           } catch (e) {
@@ -887,39 +436,38 @@ class _RecitationScreenState extends State<RecitationScreen> {
         await Future.delayed(const Duration(milliseconds: 450));
         if (_stopFlag) break;
 
-        // Audio
-        try {
-          final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$_reciter'));
-          if (r.statusCode == 200) {
-            final d = json.decode(r.body) as Map<String, dynamic>;
-            final url = d['data']['audio'] as String?;
-            if (url != null) {
-              if (mounted) setState(() => _currentAudioUrl = url);
-              if (!_stopFlag && mounted) {
-                try {
-                  // iOS fix: setUrl then play with explicit source
-                  await _player.setUrl(url);
-                  await _player.play();
-                  await _waitForPlayerStopped();
-                } catch (e) {
-                  debugPrint('Audio play error: $e');
-                  if (mounted) {
-                    setState(() => _currentAudioUrl = null);
+        // Audio recitation
+        if (withRecitation) {
+          try {
+            final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$_reciter'));
+            if (r.statusCode == 200) {
+              final d = json.decode(r.body) as Map<String, dynamic>;
+              final url = d['data']['audio'] as String?;
+              if (url != null) {
+                if (mounted) setState(() => _currentAudioUrl = url);
+                if (!_stopFlag && mounted) {
+                  try {
+                    await _player.setUrl(url);
+                    await _player.play();
+                    await _waitForPlayerStopped();
+                  } catch (e) {
+                    debugPrint('Audio play error: $e');
+                    if (mounted) setState(() => _currentAudioUrl = null);
                   }
                 }
               }
             }
+          } catch (e) {
+            debugPrint('Audio fetch error: $e');
           }
-        } catch (e) {
-          debugPrint('Audio fetch error: $e');
         }
 
         // Translation
-        if (withTranslation) {
+        if (withTranslation && _speakTranslation) {
           if (mounted) setState(() => _phase = 'translating');
           String trText = '';
           try {
-            String trId = _lang == 'French' ? 'fr.hamidullah' : 'en.sahih';
+            String trId = _lang == 'fr' ? 'fr.hamidullah' : 'en.sahih';
             final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$trId'));
             if (r.statusCode == 200) {
               final d = json.decode(r.body) as Map<String, dynamic>;
@@ -930,8 +478,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
             if (mounted) setState(() => _translationText = '(traduction indisponible)');
           }
           // Speak translation aloud
-          if (_speakTranslation && trText.isNotEmpty && !_stopFlag) {
-            final trLang = _lang == 'French' ? 'fr' : 'en';
+          if (trText.isNotEmpty && !_stopFlag) {
+            final trLang = _lang;
             await _speak(trText, trLang);
             if (_stopFlag) break;
           }
@@ -951,20 +499,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         _repeatIndex = 0;
       });
     }
-  }
-
-  Future<String?> _getTranslitId() async {
-    try {
-      final r = await http.get(Uri.parse('$kBase/edition/type/transliteration'));
-      if (r.statusCode == 200) {
-        final d = json.decode(r.body) as Map<String, dynamic>;
-        var eds = d['data'] as List;
-        return eds.where((e) => (e as Map)['identifier'] == 'en.transliteration').isNotEmpty
-            ? 'en.transliteration'
-            : (eds.isNotEmpty ? eds.first['identifier'] as String : null);
-      }
-    } catch (e) {}
-    return null;
   }
 
   Future<void> _play() async {
@@ -1011,7 +545,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
       await _runSequence(seq,
           repeats: _infiniteLoop ? 999 : _repeatCount,
           infinite: _infiniteLoop,
-          withTranslation: _translateAfter);
+          withTranslation: _speakTranslation,
+          withRecitation: _speakRecitation);
     } catch (e) {
       if (mounted) setState(() => _error = 'Erreur: $e');
     }
@@ -1019,6 +554,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Widget _card(List<Widget> children) {
     return Card(
+      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(children: children),
@@ -1039,12 +575,12 @@ class _RecitationScreenState extends State<RecitationScreen> {
   Widget _inputRow(String label, int value, int min, int max, Function(int) onChanged,
       {required TextEditingController ctrl}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500))),
           SizedBox(
-            width: 80,
+            width: 70,
             child: TextField(
               controller: ctrl,
               keyboardType: TextInputType.number,
@@ -1067,16 +603,16 @@ class _RecitationScreenState extends State<RecitationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Récitation')),
+      appBar: AppBar(title: const Text('Lecture du Coran')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // Mode tabs
           Row(
-            children: ['range', 'page', 'single']
+            children: ['single', 'range', 'page', 'loop']
                 .map((m) => Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
                         child: Material(
                           color: _mode == m ? const Color(0xFF1B5E20) : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(8),
@@ -1084,13 +620,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
                             borderRadius: BorderRadius.circular(8),
                             onTap: () => setState(() => _mode = m),
                             child: Padding(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(10),
                               child: Center(
                                 child: Text(
-                                  m == 'range' ? 'Plage' : m == 'page' ? 'Page' : 'Verset',
+                                  m == 'single' ? 'Verset' : m == 'range' ? 'Plage' : m == 'page' ? 'Page' : 'Boucle',
                                   style: TextStyle(
                                     color: _mode == m ? Colors.white : Colors.grey,
                                     fontWeight: _mode == m ? FontWeight.bold : FontWeight.normal,
+                                    fontSize: 12,
                                   ),
                                 ),
                               ),
@@ -1101,7 +638,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     ))
                 .toList(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Mode-specific inputs
           if (_mode == 'range')
@@ -1113,115 +650,104 @@ class _RecitationScreenState extends State<RecitationScreen> {
             ]),
           if (_mode == 'page')
             _card([
-              _inputRow('Page (1–$kTotalPages)', _pageNumber, 1, kTotalPages,
+              _inputRow('Page (1–604)', _pageNumber, 1, 604,
                   (v) => setState(() { _pageNumber = v; _syncControllers(); }), ctrl: _pageNumberCtrl),
             ]),
-          if (_mode == 'single')
+          if (_mode == 'single' || _mode == 'loop')
             _card([
               _inputRow('Sourate', _singleSurah, 1, 114, (v) => setState(() { _singleSurah = v; _syncControllers(); }), ctrl: _singleSurahCtrl),
               _inputRow('Verset', _singleVerse, 1, 286, (v) => setState(() { _singleVerse = v; _syncControllers(); }), ctrl: _singleVerseCtrl),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                title: const Text('Lire la traduction après'),
-                value: _translateAfter,
-                onChanged: (v) => setState(() => _translateAfter = v),
-              ),
             ]),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Settings card
           _card([
-            Row(
-              children: [
-                const Text('Répétitions:'),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Slider(
-                    value: _repeatCount.toDouble(),
-                    min: 1,
-                    max: 99,
-                    divisions: 98,
-                    label: _repeatCount.toString(),
-                    onChanged: _infiniteLoop ? null : (v) => setState(() => _repeatCount = v.round()),
-                  ),
-                ),
-                Text('x$_repeatCount'),
-              ],
+            const Text('Options de lecture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const Divider(),
+            SwitchListTile(
+              title: const Text('Annoncer Sourate + Verset'),
+              subtitle: const Text('"Sourate Al-Fatiha, verset 1"'),
+              value: _announceSurahVerse,
+              onChanged: (v) => setState(() => _announceSurahVerse = v),
             ),
             SwitchListTile(
-              title: const Text('Boucle continue'),
-              subtitle: const Text('Répéter indéfiniment'),
-              value: _infiniteLoop,
-              onChanged: (v) => setState(() => _infiniteLoop = v),
+              title: const Text('Annoncer juste "Verset X"'),
+              subtitle: const Text('Optionnel, en plus de l\'annonce de sourate'),
+              value: _announceVerseOnly,
+              onChanged: (v) => setState(() => _announceVerseOnly = v),
             ),
             SwitchListTile(
-              title: const Text('Annoncer à chaque verset'),
-              value: _announceEachVerse,
-              onChanged: (v) => setState(() => _announceEachVerse = v),
+              title: const Text('Lire la récitation'),
+              value: _speakRecitation,
+              onChanged: (v) => setState(() => _speakRecitation = v),
             ),
             SwitchListTile(
-              title: const Text('Afficher translittération'),
-              value: _showTransliteration,
-              onChanged: (v) => setState(() => _showTransliteration = v),
-            ),
-            SwitchListTile(
-              title: const Text('Lire traduction à voix haute'),
-              subtitle: const Text('Google TTS - voix naturelle'),
+              title: const Text('Lire la traduction'),
               value: _speakTranslation,
               onChanged: (v) => setState(() => _speakTranslation = v),
             ),
             SwitchListTile(
-              title: const Text('Annoncer le nom de la sourate'),
-              subtitle: const Text('Dit "Sourate X" avant la lecture'),
-              value: _announceSurah,
-              onChanged: (v) => setState(() => _announceSurah = v),
+              title: const Text('Boucle infinie'),
+              subtitle: const Text('Répéter indéfiniment'),
+              value: _infiniteLoop,
+              onChanged: (v) => setState(() => _infiniteLoop = v),
             ),
+            if (!_infiniteLoop)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    const Text('Répétitions: '),
+                    Expanded(
+                      child: Slider(
+                        value: _repeatCount.toDouble(),
+                        min: 1,
+                        max: 99,
+                        divisions: 98,
+                        label: _repeatCount.toString(),
+                        onChanged: (v) => setState(() => _repeatCount = v.round()),
+                      ),
+                    ),
+                    Text('x$_repeatCount'),
+                  ],
+                ),
+              ),
+            const Divider(),
+            const Text('Paramètres', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Text('Voix trad.:'),
+                const Text('Voix traduction:'),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Feminin'),
-                        selected: _ttsFemaleVoice,
-                        onSelected: (v) => setState(() => _ttsFemaleVoice = v),
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Masculin'),
-                        selected: !_ttsFemaleVoice,
-                        onSelected: (v) => setState(() => _ttsFemaleVoice = !v),
-                      ),
-                    ],
-                  ),
+                ChoiceChip(
+                  label: const Text('Féminin'),
+                  selected: _ttsFemaleVoice,
+                  onSelected: (v) => setState(() => _ttsFemaleVoice = v),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('Masculin'),
+                  selected: !_ttsFemaleVoice,
+                  onSelected: (v) => setState(() => _ttsFemaleVoice = !v),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Text('Langue trad.:'),
+                const Text('Langue:'),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Français'),
-                        selected: _lang == 'French',
-                        onSelected: (v) => setState(() => _lang = 'French'),
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('English'),
-                        selected: _lang == 'English',
-                        onSelected: (v) => setState(() => _lang = 'English'),
-                      ),
-                    ],
-                  ),
+                ChoiceChip(
+                  label: const Text('Français'),
+                  selected: _lang == 'fr',
+                  onSelected: (v) => setState(() => _lang = 'fr'),
+                ),
+                const SizedBox(width: 8),
+                ChoiceChip(
+                  label: const Text('English'),
+                  selected: _lang == 'en',
+                  onSelected: (v) => setState(() => _lang = 'en'),
                 ),
               ],
             ),
@@ -1237,7 +763,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     items: kReciters
                         .map((r) => DropdownMenuItem<String>(
                               value: r['id'] as String,
-                              child: Text(r['label'] as String),
+                              child: Text(r['label'] as String, style: const TextStyle(fontSize: 12)),
                             ))
                         .toList(),
                     onChanged: (v) => setState(() => _reciter = v!),
@@ -1247,7 +773,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
             ),
           ]),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
           // Buttons
           Row(
@@ -1260,7 +786,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                   child: const Padding(
                     padding: EdgeInsets.all(16),
                     child: Center(
-                        child: Text('▶ Lancer la récitation',
+                        child: Text('▶ Lancer',
                             style: TextStyle(color: Colors.white, fontSize: 16))),
                   ),
                 ),
@@ -1277,39 +803,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-              // Test audio button — isolate audio problems
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade700),
-                onPressed: () async {
-                  setState(() { _error = null; });
-                  try {
-                    debugPrint('TEST: Starting audio test...');
-                    final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=ar-SA&client=tw-ob&q=salam';
-                    await _player.stop();
-                    await _player.setUrl(url);
-                    debugPrint('TEST: URL loaded, starting play...');
-                    await _player.play();
-                    debugPrint('TEST: Play returned successfully');
-                    await Future.delayed(const Duration(seconds: 3));
-                    if (_player.playing) {
-                      debugPrint('TEST: Audio is playing!');
-                      if (mounted) setState(() => _error = 'Audio OK — la lecture fonctionne!');
-                    } else {
-                      debugPrint('TEST: Player stopped but never played. State: ${_player.processingState}');
-                      if (mounted) setState(() => _error = 'Audio stopped immediately. Vérifiez le volume et le mode silence.');
-                    }
-                    await _player.stop();
-                  } catch (e) {
-                    debugPrint('TEST error: $e');
-                    if (mounted) setState(() => _error = 'Erreur test audio: $e');
-                  }
-                },
-                child: const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Center(child: Text('🔊 TEST AUDIO (salam)', style: TextStyle(color: Colors.white, fontSize: 14))),
-                ),
-              ),
             ],
           ),
 
@@ -1322,7 +815,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
           if (_progressTotal > 0)
             Column(
               children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
                 LinearProgressIndicator(
                     value: _progressTotal > 0 ? _progressDone / _progressTotal : 0),
                 Text('$_progressDone / $_progressTotal'),
@@ -1362,7 +855,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                 ),
               const SizedBox(height: 16),
               Text(_arabicText,
-                  style: const TextStyle(fontSize: 30, fontFamily: 'Amiri', height: 2),
+                  style: const TextStyle(fontSize: 28, fontFamily: 'Amiri', height: 2),
                   textAlign: TextAlign.right),
               if (_showTransliteration && _transliterationText.isNotEmpty)
                 Padding(
@@ -1373,7 +866,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     decoration: BoxDecoration(
                         color: Colors.amber.shade50, borderRadius: BorderRadius.circular(8)),
                     child: Text(_transliterationText,
-                        style: const TextStyle(fontSize: 15, fontStyle: FontStyle.italic)),
+                        style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic)),
                   ),
                 ),
               if (_translationText.isNotEmpty)
@@ -1384,10 +877,9 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                         color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-                    child: Text(_translationText, style: const TextStyle(fontSize: 16)),
+                    child: Text(_translationText, style: const TextStyle(fontSize: 15)),
                   ),
                 ),
-              // Audio status bar
               if (_isRunning || _isPlaying)
                 Padding(
                   padding: const EdgeInsets.only(top: 12),
@@ -1398,12 +890,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
                           color: _isPlaying ? Colors.green : Colors.grey, size: 20),
                       const SizedBox(width: 8),
                       Text(_isPlaying ? 'Lecture en cours...' : 'Chargement...',
-                          style: TextStyle(
-                              color: _isPlaying ? Colors.green : Colors.grey, fontSize: 14)),
+                          style: TextStyle(color: _isPlaying ? Colors.green : Colors.grey, fontSize: 14)),
                     ],
                   ),
                 ),
-              // TTS status bar
               if (_isTtsBuffering || _isTtsPlaying)
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -1414,8 +904,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                           color: _isTtsPlaying ? Colors.blue : Colors.orange, size: 20),
                       const SizedBox(width: 8),
                       Text(_isTtsPlaying ? 'Traduction lue...' : 'Chargement TTS...',
-                          style: TextStyle(
-                              color: _isTtsPlaying ? Colors.blue : Colors.orange, fontSize: 14)),
+                          style: TextStyle(color: _isTtsPlaying ? Colors.blue : Colors.orange, fontSize: 14)),
                     ],
                   ),
                 ),
@@ -1424,232 +913,4 @@ class _RecitationScreenState extends State<RecitationScreen> {
       ),
     );
   }
-}
-
-// ============================================================
-// STUDY SCREEN
-// ============================================================
-
-class StudyScreenMain extends StatefulWidget {
-  const StudyScreenMain({super.key});
-  @override
-  State<StudyScreenMain> createState() => _StudyScreenMainState();
-}
-
-class _StudyScreenMainState extends State<StudyScreenMain> {
-  AyahData? _current;
-  int _surahNum = 1;
-  bool _showAnswer = false;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadNext();
-  }
-
-  Future<void> _loadNext() async {
-    if (!mounted) return;
-    setState(() => _loading = true);
-    final state = context.read<AppState>();
-    final due = state.getDueAyahs();
-    if (due.isEmpty) {
-      await state.loadAyahs(1);
-      setState(() => _surahNum = 1);
-    } else {
-      await state.loadAyahs(due.first.surahNumber);
-      setState(() => _surahNum = due.first.surahNumber);
-    }
-    if (mounted) {
-      setState(() => _loading = false);
-      _prepare(state);
-    }
-  }
-
-  void _prepare(AppState quran) {
-    if (quran.ayahs.isEmpty) return;
-    final study = context.read<AppState>();
-    final due = study.getDueAyahs();
-    AyahData? ayah;
-    if (due.isNotEmpty) {
-      ayah = quran.getAyahByGlobalNumber(due.first.ayahGlobalNumber);
-    }
-    if (ayah == null && quran.ayahs.isNotEmpty) {
-      ayah = quran.ayahs[DateTime.now().millisecondsSinceEpoch % quran.ayahs.length];
-    }
-    if (ayah != null && mounted) {
-      setState(() {
-        _current = ayah;
-        _showAnswer = false;
-      });
-    }
-  }
-
-  void _rate(int quality) {
-    if (_current == null) return;
-    context.read<AppState>().saveStudyProgress(StudyProgress(
-          ayahGlobalNumber: _current!.globalNumber,
-          surahNumber: _surahNum,
-          verseNumber: _current!.numberInSurah,
-          nextReview: DateTime.now().add(Duration(days: quality >= 2 ? 1 : 0)),
-        ));
-    if (mounted) {
-      setState(() => _showAnswer = false);
-      _loadNext();
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Étude'),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _loadNext)],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _current == null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.menu_book, size: 80, color: Color(0xFF1B5E20)),
-                      const SizedBox(height: 24),
-                      const Text('Mode Étude',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      const Text(
-                          'Choisissez une sourate dans l\'onglet Sourates.\nLes versets étudiés apparaîtront ici.',
-                          style: TextStyle(color: Colors.grey),
-                          textAlign: TextAlign.center),
-                      const SizedBox(height: 32),
-                      ElevatedButton.icon(
-                          onPressed: _loadNext,
-                          icon: const Icon(Icons.play_arrow),
-                          label: const Text('Commencer')),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    LinearProgressIndicator(
-                        value: state.dueCount > 0
-                            ? state.totalStudied / (state.totalStudied + state.dueCount)
-                            : 0),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Due: ${state.dueCount}'),
-                          Text('Studied: ${state.totalStudied}'),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          children: [
-                            GestureDetector(
-                              onTap: () => setState(() => _showAnswer = true),
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(24),
-                                decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    boxShadow: [
-                                      BoxShadow(
-                                          color: Colors.black.withAlpha(25),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4))
-                                    ]),
-                                child: Column(
-                                  children: [
-                                    Chip(
-                                        label: Text('Ayah ${_current!.numberInSurah}'),
-                                        backgroundColor: const Color(0xFF1B5E20),
-                                        labelStyle: const TextStyle(color: Colors.white)),
-                                    const SizedBox(height: 24),
-                                    Text(_current!.textAr,
-                                        style:
-                                            const TextStyle(fontSize: 32, fontFamily: 'Amiri', height: 2),
-                                        textAlign: TextAlign.center),
-                                    if (_showAnswer) ...[
-                                      const SizedBox(height: 16),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(12)),
-                                        child: const Text('Translation (French):',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.bold, color: Colors.blue)),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            borderRadius: BorderRadius.circular(12)),
-                                        child: Text(_current!.textFr ?? '',
-                                            style: const TextStyle(fontSize: 16)),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            if (_showAnswer)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  _RateBtn(label: 'Noir', color: Colors.black, q: 0, onRate: _rate),
-                                  _RateBtn(label: 'Rouge', color: Colors.red, q: 1, onRate: _rate),
-                                  _RateBtn(label: 'Orange', color: Colors.orange, q: 2, onRate: _rate),
-                                  _RateBtn(label: 'Vert', color: Colors.green, q: 3, onRate: _rate),
-                                ],
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-    );
-  }
-}
-
-class _RateBtn extends StatelessWidget {
-  final String label;
-  final Color color;
-  final int q;
-  final Function(int) onRate;
-  const _RateBtn(
-      {required this.label, required this.color, required this.q, required this.onRate});
-  @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          InkWell(
-            onTap: () => onRate(q),
-            borderRadius: BorderRadius.circular(50),
-            child: Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                  color: color.withAlpha(51),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color, width: 2)),
-              child: Icon(q >= 2 ? Icons.check : Icons.close, color: color, size: 24),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 11)),
-        ],
-      );
 }
