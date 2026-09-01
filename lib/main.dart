@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 
 void main() => runApp(const QuranApp());
@@ -158,7 +157,7 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
   bool _speakTranslation = true;
   bool _speakRecitation = true;
   bool _infiniteLoop = false;
-  bool _showTransliteration = false;
+  final bool _showTransliteration = false;
   int _repeatCount = 1;
   bool _ttsFemaleVoice = false;
   String _lang = 'fr';
@@ -179,7 +178,6 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
   bool _stopFlag = false;
   
   final _player = AudioPlayer();
-  String? _currentAudioUrl;
   bool _isPlaying = false;
   bool _isTtsPlaying = false;
   bool _isTtsBuffering = false;
@@ -255,6 +253,37 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
     }
   }
 
+  // TEST: Play a known Arabic audio URL (Bismillah from Al-Fatiha)
+  Future<void> _testAudio() async {
+    _stopFlag = false;
+    try {
+      final url = 'https://verses.quran.gov/Alafasy/001001.mp3';
+      debugPrint('TEST AUDIO: playing $url');
+      setState(() { _error = null; _phase = 'reciting'; });
+      await _player.setUrl(url);
+      await _player.play();
+      await _waitForPlayerStopped();
+      debugPrint('TEST AUDIO: done');
+      if (mounted) setState(() => _phase = 'idle');
+    } catch (e) {
+      debugPrint('TEST AUDIO error: $e');
+      if (mounted) setState(() => _error = 'TEST Audio erreur: $e');
+    }
+  }
+
+  // TEST: Play a known TTS URL (French "salam")
+  Future<void> _testTts() async {
+    _stopFlag = false;
+    try {
+      setState(() { _error = null; _phase = 'announcing'; });
+      await _speak('salam', 'fr');
+      if (mounted) setState(() => _phase = 'idle');
+    } catch (e) {
+      debugPrint('TEST TTS error: $e');
+      if (mounted) setState(() => _error = 'TEST TTS erreur: $e');
+    }
+  }
+
   // Build Google TTS URL with client signature for male/female voices
   String _buildGoogleTtsUrl(String text, String lang, bool female) {
     final clean = text.replaceAll(RegExp(r'[()]'), '');
@@ -290,16 +319,19 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
       final url = await _getCachedTtsUrl(text, lang, _ttsFemaleVoice);
       if (url == null || _stopFlag) return;
 
+      debugPrint('TTS: playing url=$url text="$text"');
       if (mounted) setState(() => _isTtsBuffering = true);
       await _player.stop();
       await _player.setUrl(url);
       if (mounted) setState(() { _isTtsPlaying = true; _isTtsBuffering = false; });
       await _player.play();
-      
+      debugPrint('TTS: started playback');
+
       int attempts = 0;
       while (!_stopFlag && attempts < 150) {
         if (!_player.playing) {
           final ps = _player.processingState;
+          debugPrint('TTS: state=playing=$_player.playing processingState=$ps attempts=$attempts');
           if (ps == ProcessingState.completed || ps == ProcessingState.idle) break;
         }
         await Future.delayed(const Duration(milliseconds: 300));
@@ -309,6 +341,7 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
         await _player.stop();
         if (mounted) setState(() { _isTtsPlaying = false; _isTtsBuffering = false; });
       }
+      debugPrint('TTS: done');
     } catch (e) {
       debugPrint('TTS error: $e');
       if (mounted) setState(() => _error = 'Erreur TTS: $e');
@@ -360,7 +393,9 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
                 cachedSurahName = surahName;
                 cachedSurahNum = surah;
               }
-            } catch (e) {}
+            } catch (e) {
+              debugPrint('Surah name fetch error: $e');
+            }
           }
           
           lastSurah = surah;
@@ -382,8 +417,8 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
             if (_stopFlag) break;
           }
           
-          // Optional separate "Verset Y" announcement
-          if (_announceVerseOnly && !_announceSurahVerse) {
+          // Optional separate "Verset Y" announcement (additional, not replacement)
+          if (_announceVerseOnly) {
             final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
             await _speak(verseText, _lang);
             if (_stopFlag) break;
@@ -444,15 +479,16 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
               final d = json.decode(r.body) as Map<String, dynamic>;
               final url = d['data']['audio'] as String?;
               if (url != null) {
-                if (mounted) setState(() => _currentAudioUrl = url);
                 if (!_stopFlag && mounted) {
                   try {
+                    debugPrint('Audio: playing url=$url');
                     await _player.setUrl(url);
                     await _player.play();
+                    debugPrint('Audio: started playback');
                     await _waitForPlayerStopped();
+                    debugPrint('Audio: done');
                   } catch (e) {
                     debugPrint('Audio play error: $e');
-                    if (mounted) setState(() => _currentAudioUrl = null);
                   }
                 }
               }
@@ -519,7 +555,7 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
       if (_mode == 'range') {
         for (int s = _startSurah; s <= _endSurah; s++) {
           final startV = (s == _startSurah) ? _startVerse : 1;
-          final endV = (s == _endSurah) ? _endVerse : (kAyahCounts[s - 1] ?? 30);
+          final endV = (s == _endSurah) ? _endVerse : kAyahCounts[s - 1];
           for (int v = startV; v <= endV; v++) {
             seq.add({'surah': s, 'verse': v});
           }
@@ -800,6 +836,33 @@ class _RecitationScreenState extends State<RecitationScreen> with SingleTickerPr
                     padding: EdgeInsets.all(16),
                     child: Center(
                         child: Text('⏹ Arrêter', style: TextStyle(color: Colors.white, fontSize: 16))),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // Test buttons (debug)
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isRunning ? null : _testAudio,
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Center(child: Text('🔊 TEST Audio', style: TextStyle(fontSize: 13))),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isRunning ? null : _testTts,
+                  child: const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Center(child: Text('🗣 TEST TTS', style: TextStyle(fontSize: 13))),
                   ),
                 ),
               ),
