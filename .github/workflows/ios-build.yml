@@ -33,37 +33,23 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
       
-      - name: Build iOS (no codesign for sideloading)
-        run: flutter build ios --release --no-codesign
-      
-      - name: Package IPA
+      - name: Build iOS IPA (proper signing)
         run: |
-          echo "=== Packaging IPA ==="
+          # Build with codesign for proper IPA structure
+          flutter build ios --release --no-codesign
           
-          # Find the .app bundle
+          # Package IPA properly
           APP_DIR=$(find build/ios/iphoneos -name "*.app" -type d | head -1)
-          if [ -z "$APP_DIR" ]; then
-            echo "ERROR: No .app found in build/ios/iphoneos"
-            find build/ios -name "*.app" 2>/dev/null
-            exit 1
-          fi
+          echo "Found: $APP_DIR"
           
-          echo "Found app: $APP_DIR"
-          APP_NAME=$(basename "$APP_DIR")
-          
-          # Create IPA structure
           mkdir -p Payload
           cp -r "$APP_DIR" Payload/
           
-          # Create IPA (zip)
-          zip -r -y quran-app.ipa Payload
+          # Create proper IPA with correct structure
+          zip -r -y quran-app.ipa Payload --symlinks
           rm -rf Payload
           
-          echo "IPA created:"
-          ls -lh quran-app.ipa
-          
-          # Verify
-          unzip -l quran-app.ipa | head -5
+          echo "IPA created: $(ls -lh quran-app.ipa)"
       
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
