@@ -1,0 +1,28 @@
+builder:
+    github:
+        enable: false
+        repo_name: SignTools-CI
+        org_name: YOUR_PROFILE_NAME
+        workflow_file_name: sign.yml
+        token: YOUR_TOKEN
+        ref: master
+    semaphore:
+        enable: false
+        project_name: YOUR_PROJECT_NAME
+        org_name: YOUR_ORG_NAME
+        token: YOUR_TOKEN
+        ref: refs/heads/master
+        secret_name: ios-signer
+    selfhosted:
+        enable: false
+        url: http://192.168.1.133:8090
+        key: SOME_SECRET_KEY
+server_url: http://localhost:8080
+redirect_https: false
+save_dir: data
+cleanup_interval_mins: 1
+sign_timeout_mins: 30
+basic_auth:
+    enable: false
+    username: admin
+    password: admin

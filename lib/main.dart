@@ -69,6 +69,24 @@ const kAyahCounts = [
 // HELPERS
 // ============================================================
 
+const kEveryAyahFolders = {
+  'ar.alafasy': 'Alafasy_128kbps',
+  'ar.husary': 'Husary_128kbps',
+  'ar.minshawi': 'Minshawy_Murattal_128kbps',
+  'ar.abdulbasitmurattal': 'Abdul_Basit_Murattal_192kbps',
+  'ar.abdulsamad': 'Abdul_Basit_Mujawwad_128kbps',
+  'ar.shaatree': 'Abu_Bakr_Ash-Shaatree_128kbps',
+  'ar.abdurrahmansudais': 'Abdurrahmaan_As-Sudais_192kbps',
+  'ar.hudhaifi': 'Hudhaify_128kbps',
+};
+
+String getRecitationUrl(String reciter, int surah, int verse) {
+  final folder = kEveryAyahFolders[reciter] ?? 'Alafasy_128kbps';
+  final s = surah.toString().padLeft(3, '0');
+  final v = verse.toString().padLeft(3, '0');
+  return 'https://everyayah.com/data/$folder/$s$v.mp3';
+}
+
 /// Build recitation filename for local cache
 String recitationFilename(String reciter, int surah, int verse) {
   return '${reciter.replaceAll('.', '_')}_${surah.toString().padLeft(3, '0')}_${verse.toString().padLeft(3, '0')}.mp3';
@@ -76,16 +94,7 @@ String recitationFilename(String reciter, int surah, int verse) {
 
 /// Get recitation audio URL from API
 Future<String?> fetchRecitationUrl(String reciter, int surah, int verse) async {
-  try {
-    final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$reciter'));
-    if (r.statusCode == 200) {
-      final d = json.decode(r.body) as Map<String, dynamic>;
-      return d['data']['audio'] as String?;
-    }
-  } catch (e) {
-    debugPrint('fetchRecitationUrl error: $e');
-  }
-  return null;
+  return getRecitationUrl(reciter, surah, verse);
 }
 
 /// Download and cache a recitation MP3
@@ -497,15 +506,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // -----------------------------------------------------------
 
   Future<void> _waitForTtsPlayerStopped() async {
-    for (int i = 0; i < 120; i++) {
+    for (int i = 0; i < 200; i++) {
       if (_stopFlag) return;
       final ps = _ttsPlayer.processingState;
       if (ps == ProcessingState.completed || ps == ProcessingState.idle) return;
-      if (!_ttsPlayer.playing) {
-        await Future.delayed(const Duration(milliseconds: 400));
-        continue;
-      }
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(const Duration(milliseconds: 100));
     }
   }
 
@@ -528,10 +533,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
       final res = await _flutterTts.speak(text);
       if (res == 1 || res == true) {
         await _ttsCompleter!.future.timeout(
-          const Duration(seconds: 4),
+          const Duration(seconds: 2),
           onTimeout: () {
             _flutterTts.stop();
-            debugPrint('TTS native timeout (4s), falling back to HTTP');
+            debugPrint('TTS native timeout (2s), falling back to HTTP');
           },
         );
         spokeNatively = true;
@@ -544,17 +549,17 @@ class _RecitationScreenState extends State<RecitationScreen> {
       try {
         if (mounted) setState(() => _isTtsPlaying = true);
         final cleanText = text.replaceAll(RegExp(r'[()]'), '');
-        final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
+        final tl = lang == 'fr' ? 'fr' : (lang == 'ar' ? 'ar' : 'en');
         final encoded = Uri.encodeComponent(cleanText);
         final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
         await _ttsPlayer.stop();
-        await _ttsPlayer.setUrl(url);
+        await _ttsPlayer.setUrl(url, headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'});
         await _ttsPlayer.play();
         await _waitForTtsPlayerStopped();
       } catch (e) {
         debugPrint('HTTP TTS error: $e');
-        await Future.delayed(const Duration(milliseconds: 400));
+        await Future.delayed(const Duration(milliseconds: 200));
       }
     }
 
@@ -562,19 +567,15 @@ class _RecitationScreenState extends State<RecitationScreen> {
   }
 
   // -----------------------------------------------------------
-  // RECITATION PLAYBACK (with local cache)
+  // RECITATION PLAYBACK (with local cache + direct CDN)
   // -----------------------------------------------------------
 
   Future<void> _waitForPlayerStopped() async {
-    for (int i = 0; i < 120; i++) {
+    for (int i = 0; i < 300; i++) {
       if (_stopFlag) return;
       final ps = _player.processingState;
       if (ps == ProcessingState.completed || ps == ProcessingState.idle) return;
-      if (!_player.playing) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        continue;
-      }
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 150));
     }
   }
 
@@ -582,43 +583,24 @@ class _RecitationScreenState extends State<RecitationScreen> {
     if (_stopFlag) return;
     try {
       if (_cacheDir == null) {
-        _cacheDir = Directory('${(await getApplicationDocumentsDirectory()).path}/recitations');
+        final docDir = await getApplicationDocumentsDirectory();
+        _cacheDir = Directory('${docDir.path}/recitations');
         if (!await _cacheDir!.exists()) await _cacheDir!.create(recursive: true);
       }
 
+      final url = getRecitationUrl(_reciter, surah, verse);
       final filename = recitationFilename(_reciter, surah, verse);
       final file = File('${_cacheDir!.path}/$filename');
 
-      if (await file.exists()) {
-        // Play from local cache
+      await _player.stop();
+
+      if (await file.exists() && await file.length() > 0) {
         debugPrint('Recitation: playing from cache ${file.path}');
         await _player.setFilePath(file.path);
       } else {
-        // Download and play
-        final url = await fetchRecitationUrl(_reciter, surah, verse);
-        if (url == null) {
-          debugPrint('Recitation: no URL for $surah:$verse');
-          return;
-        }
-        debugPrint('Recitation: downloading $url');
-        try {
-          final client = http.Client();
-          final request = http.Request('GET', Uri.parse(url));
-          final response = await client.send(request);
-          if (response.statusCode == 200) {
-            final bytes = await response.stream.toBytes();
-            await file.writeAsBytes(bytes);
-            debugPrint('Recitation: saved to cache ${file.path}');
-            await _player.setFilePath(file.path);
-          } else {
-            debugPrint('Recitation: download failed ${response.statusCode}');
-            return;
-          }
-          client.close();
-        } catch (e) {
-          debugPrint('Recitation download error: $e');
-          return;
-        }
+        debugPrint('Recitation: streaming $url');
+        await _player.setUrl(url);
+        _backgroundCacheDownload(url, file);
       }
 
       if (!_stopFlag && mounted) {
@@ -629,6 +611,18 @@ class _RecitationScreenState extends State<RecitationScreen> {
       }
     } catch (e) {
       debugPrint('Recitation error: $e');
+    }
+  }
+
+  void _backgroundCacheDownload(String url, File file) async {
+    try {
+      final res = await http.get(Uri.parse(url));
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        await file.writeAsBytes(res.bodyBytes);
+        debugPrint('Cached background recitation: ${file.path}');
+      }
+    } catch (e) {
+      debugPrint('Background cache error: $e');
     }
   }
 
