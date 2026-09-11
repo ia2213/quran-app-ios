@@ -772,9 +772,16 @@ class _RecitationScreenState extends State<RecitationScreen> {
       List<Map<String, int>> seq = [];
 
       if (_mode == 'range') {
-        for (int s = _startSurah; s <= _endSurah; s++) {
-          final startV = (s == _startSurah) ? _startVerse : 1;
-          final endV = (s == _endSurah) ? _endVerse : kAyahCounts[s - 1];
+        int sSurah = _startSurah;
+        int eSurah = _endSurah;
+        if (sSurah > eSurah) { int tmp = sSurah; sSurah = eSurah; eSurah = tmp; }
+
+        for (int s = sSurah; s <= eSurah; s++) {
+          int maxAyah = kAyahCounts[s - 1];
+          int startV = (s == sSurah) ? _startVerse.clamp(1, maxAyah) : 1;
+          int endV = (s == eSurah) ? _endVerse.clamp(1, maxAyah) : maxAyah;
+          if (startV > endV) { int t = startV; startV = endV; endV = t; }
+
           for (int v = startV; v <= endV; v++) {
             seq.add({'surah': s, 'verse': v});
           }
@@ -792,7 +799,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
           debugPrint('Page fetch error: $e');
         }
       } else {
-        seq.add({'surah': _singleSurah, 'verse': _singleVerse});
+        int surah = _singleSurah.clamp(1, 114);
+        int maxAyah = kAyahCounts[surah - 1];
+        int verse = _singleVerse.clamp(1, maxAyah);
+        seq.add({'surah': surah, 'verse': verse});
       }
 
       if (seq.isEmpty) {
@@ -1037,46 +1047,40 @@ class _RecitationScreenState extends State<RecitationScreen> {
             const SizedBox(height: 8),
 
             // Voice dropdown
-            if (filteredVoices.isNotEmpty)
-              Row(
-                children: [
-                  const Text('Voix:'),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: DropdownButton<Map<String, dynamic>>(
-                      value: filteredVoices.firstWhere(
-                        (v) => (v['name'] as String?) == _selectedVoice['name'],
-                        orElse: () => filteredVoices.first,
-                      ),
-                      isExpanded: true,
-                      items: filteredVoices.map((v) {
-                        final name = v['name'] as String? ?? 'Unknown';
-                        final locale = v['locale'] as String? ?? '';
-                        return DropdownMenuItem(
-                          value: v,
-                          child: Text('$name ($locale)', style: const TextStyle(fontSize: 12)),
-                        );
-                      }).toList(),
-                      onChanged: (v) {
-                        if (v != null) {
-                          setState(() {
-                            _selectedVoice = {
-                              'name': (v['name'] as String?) ?? '',
-                              'locale': (v['locale'] as String?) ?? '',
-                            };
-                          });
-                          _flutterTts.setVoice(_selectedVoice);
-                          _savePref('ttsVoiceName', _selectedVoice['name']);
-                          _savePref('ttsVoiceLocale', _selectedVoice['locale']);
-                        }
-                      },
-                    ),
+            Row(
+              children: [
+                const Text('Voix TTS:'),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButton<Map<String, String>>(
+                    value: _selectedVoice.isNotEmpty ? _selectedVoice : null,
+                    hint: Text(filteredVoices.isNotEmpty ? 'Voix automatique' : 'Voix système / Web Auto',
+                        style: const TextStyle(fontSize: 12)),
+                    isExpanded: true,
+                    items: filteredVoices.map((v) {
+                      final name = v['name'] as String? ?? 'Unknown';
+                      final locale = v['locale'] as String? ?? '';
+                      final voiceMap = {
+                        'name': name,
+                        'locale': locale,
+                      };
+                      return DropdownMenuItem<Map<String, String>>(
+                        value: voiceMap,
+                        child: Text('$name ($locale)', style: const TextStyle(fontSize: 12)),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() { _selectedVoice = v; });
+                        _flutterTts.setVoice(_selectedVoice);
+                        _savePref('ttsVoiceName', _selectedVoice['name']);
+                        _savePref('ttsVoiceLocale', _selectedVoice['locale']);
+                      }
+                    },
                   ),
-                ],
-              )
-            else
-              const Text('Aucune voix disponible — installez une voix dans les paramètres système',
-                  style: TextStyle(fontSize: 12, color: Colors.orange)),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
 
             // ---- RECITER ----
