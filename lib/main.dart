@@ -332,6 +332,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
     try {
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
+      await session.setActive(true);
       session.interruptionEventStream.listen((event) {
         debugPrint('Audio interruption: ${event.type}');
         if (event.begin) {
@@ -352,6 +353,18 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Future<void> _initTts() async {
     try {
+      if (Platform.isIOS) {
+        await _flutterTts.setIosAudioCategory(
+          IosTextToSpeechAudioCategory.playback,
+          [
+            IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
+            IosTextToSpeechAudioCategoryOptions.allowBluetooth,
+            IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
+          ],
+          IosTextToSpeechAudioMode.defaultMode,
+        );
+      }
       await _flutterTts.setSpeechRate(0.5);
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
@@ -491,10 +504,15 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
       // Apply voice selection
       if (_selectedVoice.isNotEmpty) {
-        await _flutterTts.setVoice(_selectedVoice);
+        try {
+          await _flutterTts.setVoice(_selectedVoice);
+        } catch (e) {
+          debugPrint('setVoice error: $e');
+        }
       }
 
       if (mounted) setState(() => _isTtsPlaying = true);
+      final stopwatch = Stopwatch()..start();
       await _flutterTts.speak(text);
 
       // Wait for completion or stop
@@ -505,9 +523,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
           debugPrint('TTS: timeout');
         },
       );
+
+      if (stopwatch.elapsedMilliseconds < 200) {
+        await Future.delayed(Duration(milliseconds: 400 - stopwatch.elapsedMilliseconds));
+      }
     } catch (e) {
       debugPrint('TTS speak error: $e');
       if (mounted) setState(() => _error = 'Erreur TTS: $e');
+      await Future.delayed(const Duration(milliseconds: 400));
     }
     if (mounted) setState(() => _isTtsPlaying = false);
   }
