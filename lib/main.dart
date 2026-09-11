@@ -294,6 +294,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   // Audio players - recitation + TTS
   final _player = AudioPlayer();
+  final _ttsPlayer = AudioPlayer();
   bool _isPlaying = false;
 
   // Local TTS
@@ -495,6 +496,19 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // LOCAL TTS
   // -----------------------------------------------------------
 
+  Future<void> _waitForTtsPlayerStopped() async {
+    for (int i = 0; i < 120; i++) {
+      if (_stopFlag) return;
+      final ps = _ttsPlayer.processingState;
+      if (ps == ProcessingState.completed || ps == ProcessingState.idle) return;
+      if (!_ttsPlayer.playing) {
+        await Future.delayed(const Duration(milliseconds: 400));
+        continue;
+      }
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+  }
+
   Future<void> _speak(String text, String lang) async {
     if (text.isEmpty || _stopFlag) return;
 
@@ -534,10 +548,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
         final encoded = Uri.encodeComponent(cleanText);
         final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
-        await _player.stop();
-        await _player.setUrl(url);
-        await _player.play();
-        await _waitForPlayerStopped();
+        await _ttsPlayer.stop();
+        await _ttsPlayer.setUrl(url);
+        await _ttsPlayer.play();
+        await _waitForTtsPlayerStopped();
       } catch (e) {
         debugPrint('HTTP TTS error: $e');
         await Future.delayed(const Duration(milliseconds: 400));
@@ -680,9 +694,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        // Announce surah name when changing surah
+        // Announce surah name & initial verse ONCE when entering a new surah
         if (surah != lastSurah) {
-          // Use local surah name (no API call needed)
           String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
           lastSurah = surah;
 
@@ -700,12 +713,17 @@ class _RecitationScreenState extends State<RecitationScreen> {
             await _speak(announceText, _lang);
             if (_stopFlag) break;
           }
-
-          if (_announceVerseOnly) {
-            final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
-            await _speak(verseText, _lang);
-            if (_stopFlag) break;
+        } else if (_announceVerseOnly) {
+          // Announce verse number ONLY if option is enabled for subsequent verses
+          if (mounted) {
+            setState(() {
+              _currentVerseNum = verse;
+              _phase = 'announcing';
+            });
           }
+          final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
+          await _speak(verseText, _lang);
+          if (_stopFlag) break;
         }
 
         if (mounted) {
