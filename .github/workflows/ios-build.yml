@@ -32,7 +32,12 @@ jobs:
       
       - name: Get dependencies
         run: flutter pub get
-      
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install
+
       - name: Build iOS IPA (proper signing)
         run: |
           # Build with codesign for proper IPA structure
