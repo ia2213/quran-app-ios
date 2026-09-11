@@ -497,41 +497,51 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Future<void> _speak(String text, String lang) async {
     if (text.isEmpty || _stopFlag) return;
+
+    // 1. Try native flutter_tts
+    bool nativeSuccess = false;
     try {
       _ttsCompleter = Completer<void>();
-      final ttsLang = lang == 'fr' ? 'fr-FR' : 'en-US';
+      final ttsLang = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
       await _flutterTts.setLanguage(ttsLang);
 
-      // Apply voice selection
       if (_selectedVoice.isNotEmpty) {
         try {
           await _flutterTts.setVoice(_selectedVoice);
-        } catch (e) {
-          debugPrint('setVoice error: $e');
-        }
+        } catch (_) {}
       }
 
       if (mounted) setState(() => _isTtsPlaying = true);
-      final stopwatch = Stopwatch()..start();
-      await _flutterTts.speak(text);
-
-      // Wait for completion or stop
-      await _ttsCompleter!.future.timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          _flutterTts.stop();
-          debugPrint('TTS: timeout');
-        },
-      );
-
-      if (stopwatch.elapsedMilliseconds < 200) {
-        await Future.delayed(Duration(milliseconds: 400 - stopwatch.elapsedMilliseconds));
+      final res = await _flutterTts.speak(text);
+      if (res == 1 || res == true) {
+        await _ttsCompleter!.future.timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => _flutterTts.stop(),
+        );
+        nativeSuccess = true;
       }
     } catch (e) {
-      debugPrint('TTS speak error: $e');
-      if (mounted) setState(() => _error = 'Erreur TTS: $e');
-      await Future.delayed(const Duration(milliseconds: 400));
+      debugPrint('Native TTS unavailable ($e), using HTTP TTS fallback');
     }
+
+    // 2. HTTP TTS fallback (Google TTS via just_audio _player)
+    if (!nativeSuccess && !_stopFlag) {
+      try {
+        if (mounted) setState(() => _isTtsPlaying = true);
+        final cleanText = text.replaceAll(RegExp(r'[()]'), '');
+        final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
+        final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=${Uri.encodeComponent(cleanText)}';
+
+        await _player.stop();
+        await _player.setUrl(url);
+        await _player.play();
+        await _waitForPlayerStopped();
+      } catch (e) {
+        debugPrint('HTTP TTS fallback error: $e');
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+    }
+
     if (mounted) setState(() => _isTtsPlaying = false);
   }
 
