@@ -47,7 +47,7 @@ const kSurahNames = [
   'As-Saff',"Al-Jumu'a",'Al-Munaafiqoon','At-Taghaabun','At-Talaaq',
   'At-Tahrim','Al-Mulk','Al-Qalam','Al-Haaqqa',"Al-Ma'aarij",
   'Nooh','Al-Jinn','Al-Muzzammil','Al-Muddaththir','Al-Qiyaama',
-  'Al-Insaan','An-Naba',"An-Naazi'at","Abasa","At-Takwir",
+  'Al-Insaan','Al-Mursalaat','An-Naba',"An-Naazi'at","Abasa","At-Takwir",
   'Al-Infitaar','Al-Mutaffifin','Al-Inshiqaaq','Al-Burooj','At-Taariq',
   "Al-A'laa","Al-Ghaashiya",'Al-Fajr','Al-Balad','Ash-Shams',
   'Al-Lail','Ad-Dhuhaa','Ash-Sharh','At-Tin','Al-Alaq',
