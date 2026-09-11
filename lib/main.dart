@@ -498,8 +498,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
   Future<void> _speak(String text, String lang) async {
     if (text.isEmpty || _stopFlag) return;
 
-    // 1. Try native flutter_tts
-    bool nativeSuccess = false;
+    bool spokeNatively = false;
     try {
       _ttsCompleter = Completer<void>();
       final ttsLang = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
@@ -515,30 +514,33 @@ class _RecitationScreenState extends State<RecitationScreen> {
       final res = await _flutterTts.speak(text);
       if (res == 1 || res == true) {
         await _ttsCompleter!.future.timeout(
-          const Duration(seconds: 30),
-          onTimeout: () => _flutterTts.stop(),
+          const Duration(seconds: 4),
+          onTimeout: () {
+            _flutterTts.stop();
+            debugPrint('TTS native timeout (4s), falling back to HTTP');
+          },
         );
-        nativeSuccess = true;
+        spokeNatively = true;
       }
     } catch (e) {
-      debugPrint('Native TTS unavailable ($e), using HTTP TTS fallback');
+      debugPrint('Native TTS error: $e');
     }
 
-    // 2. HTTP TTS fallback (Google TTS via just_audio _player)
-    if (!nativeSuccess && !_stopFlag) {
+    if (!spokeNatively && !_stopFlag) {
       try {
         if (mounted) setState(() => _isTtsPlaying = true);
         final cleanText = text.replaceAll(RegExp(r'[()]'), '');
         final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
-        final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=${Uri.encodeComponent(cleanText)}';
+        final encoded = Uri.encodeComponent(cleanText);
+        final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
         await _player.stop();
         await _player.setUrl(url);
         await _player.play();
         await _waitForPlayerStopped();
       } catch (e) {
-        debugPrint('HTTP TTS fallback error: $e');
-        await Future.delayed(const Duration(milliseconds: 500));
+        debugPrint('HTTP TTS error: $e');
+        await Future.delayed(const Duration(milliseconds: 400));
       }
     }
 
