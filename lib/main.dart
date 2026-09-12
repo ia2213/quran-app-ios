@@ -1,4 +1,3 @@
-import 'package:just_audio_background/just_audio_background.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -11,19 +10,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await JustAudioBackground.init(
-      androidNotificationChannelId: 'com.ia2213.quranapp.audio',
-      androidNotificationChannelName: 'Quran Recitation',
-      androidNotificationOngoing: true,
-    );
-  } catch (e) {
-    debugPrint('JustAudioBackground init error: $e');
-  }
-  runApp(const QuranApp());
-}
+void main() => runApp(const QuranApp());
 
 // ============================================================
 // DATA
@@ -540,19 +527,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
       final encoded = Uri.encodeComponent(cleanText);
       final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
-      final mediaTag = MediaItem(
-        id: 'tts_\${DateTime.now().millisecondsSinceEpoch}',
-        album: 'Annonce',
-        title: text,
-        artist: 'Quran App',
-      );
-
       await _player.stop();
       await _player.setAudioSource(
         AudioSource.uri(
           Uri.parse(url),
           headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'},
-          tag: mediaTag,
         ),
       );
       await _player.play();
@@ -637,13 +616,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
     List<AudioSource> sources = [];
 
-    // Build repeat playlist
     for (int rep = 0; rep < (infinite ? 999 : repeats); rep++) {
       for (var ref in seq) {
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        // Surah Arabic Announcement
         if (surah != lastSurah && _announceSurahVerse) {
           lastSurah = surah;
           String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : '$surah';
@@ -652,32 +629,13 @@ class _RecitationScreenState extends State<RecitationScreen> {
             AudioSource.uri(
               Uri.parse(announceUrl),
               headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'},
-              tag: MediaItem(
-                id: 'ann_\${surah}_\${verse}',
-                album: 'Sourate \${kSurahNames[surah - 1]}',
-                title: 'سورة $surahNameAr',
-                artist: 'Quran App',
-              ),
             ),
           );
         }
 
-        // Verse Recitation
         if (withRecitation) {
           final url = getRecitationUrl(_reciter, surah, verse);
-          final surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
-          final reciterLabel = kReciters.firstWhere((r) => r['id'] == _reciter, orElse: () => {'label': _reciter})['label']!;
-          sources.add(
-            AudioSource.uri(
-              Uri.parse(url),
-              tag: MediaItem(
-                id: '$surah:$verse',
-                album: 'Sourate $surahName',
-                title: 'Verset $verse',
-                artist: reciterLabel,
-              ),
-            ),
-          );
+          sources.add(AudioSource.uri(Uri.parse(url)));
         }
       }
     }
@@ -689,27 +647,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
     final playlist = ConcatenatingAudioSource(children: sources);
 
-    final indexSub = _player.currentIndexStream.listen((index) {
-      if (index != null && index >= 0 && index < sources.length) {
-        final item = sources[index];
-        if (item is UriAudioSource && item.tag is MediaItem) {
-          final tag = item.tag as MediaItem;
-          if (mounted) {
-            setState(() {
-              _currentSurahName = tag.album ?? '';
-              if (!tag.id.startsWith('ann_')) {
-                final parts = tag.id.split(':');
-                if (parts.length == 2) {
-                  _currentVerseNum = int.tryParse(parts[1]) ?? 1;
-                }
-              }
-              _phase = tag.id.startsWith('ann_') ? 'announcing' : 'reciting';
-            });
-          }
-        }
-      }
-    });
-
     try {
       await _player.stop();
       await _player.setAudioSource(playlist);
@@ -720,8 +657,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
       );
     } catch (e) {
       debugPrint('Sequence execution error: $e');
+      if (mounted) setState(() => _error = 'Erreur lecture: $e');
     } finally {
-      await indexSub.cancel();
       if (mounted) {
         setState(() {
           _phase = 'idle';
