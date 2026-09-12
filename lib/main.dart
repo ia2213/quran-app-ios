@@ -584,62 +584,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
     }
   }
 
-  Future<void> _playRecitation(int surah, int verse) async {
-    if (_stopFlag) return;
-    try {
-      if (_cacheDir == null) {
-        final docDir = await getApplicationDocumentsDirectory();
-        _cacheDir = Directory('${docDir.path}/recitations');
-        if (!await _cacheDir!.exists()) await _cacheDir!.create(recursive: true);
-      }
-
-      final url = getRecitationUrl(_reciter, surah, verse);
-      final filename = recitationFilename(_reciter, surah, verse);
-      final file = File('${_cacheDir!.path}/$filename');
-
-      await _player.stop();
-
-      final surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
-      final reciterLabel = kReciters.firstWhere((r) => r['id'] == _reciter, orElse: () => {'label': _reciter})['label']!;
-      final mediaTag = MediaItem(
-        id: '$surah:$verse',
-        album: 'Sourate $surahName',
-        title: 'Verset $verse',
-        artist: reciterLabel,
-      );
-
-      if (await file.exists() && await file.length() > 0) {
-        debugPrint('Recitation: playing from cache ${file.path}');
-        await _player.setAudioSource(AudioSource.file(file.path, tag: mediaTag));
-      } else {
-        debugPrint('Recitation: streaming $url');
-        await _player.setAudioSource(AudioSource.uri(Uri.parse(url), tag: mediaTag));
-        _backgroundCacheDownload(url, file);
-      }
-
-      if (!_stopFlag && mounted) {
-        await _player.play();
-        debugPrint('Recitation: started playback');
-        await _waitForPlayerStopped();
-        debugPrint('Recitation: done');
-      }
-    } catch (e) {
-      debugPrint('Recitation error: $e');
-    }
-  }
-
-  void _backgroundCacheDownload(String url, File file) async {
-    try {
-      final res = await http.get(Uri.parse(url));
-      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
-        await file.writeAsBytes(res.bodyBytes);
-        debugPrint('Cached background recitation: ${file.path}');
-      }
-    } catch (e) {
-      debugPrint('Background cache error: $e');
-    }
-  }
-
   // -----------------------------------------------------------
   // TEST BUTTONS
   // -----------------------------------------------------------
@@ -689,95 +633,101 @@ class _RecitationScreenState extends State<RecitationScreen> {
       {int repeats = 3, bool infinite = false, bool withTranslation = true, bool withRecitation = true}) async {
     _stopFlag = false;
     _isRunning = true;
-    int done = 0;
-    int rep = 0;
     int lastSurah = -1;
 
-    while (!_stopFlag && (infinite || rep < repeats)) {
-      rep++;
-      if (mounted) setState(() => _repeatIndex = rep);
+    List<AudioSource> sources = [];
 
+    // Build repeat playlist
+    for (int rep = 0; rep < (infinite ? 999 : repeats); rep++) {
       for (var ref in seq) {
-        if (_stopFlag) break;
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        // Announce surah name & initial verse ONCE when entering a new surah
-        if (surah != lastSurah) {
-          String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
-          String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : 'سورة $surah';
+        // Surah Arabic Announcement
+        if (surah != lastSurah && _announceSurahVerse) {
           lastSurah = surah;
-
-          if (_announceSurahVerse) {
-            if (mounted) {
-              setState(() {
-                _currentSurahName = surahName;
-                _currentVerseNum = verse;
-                _phase = 'announcing';
-              });
-            }
-            await _speak('سورة $surahNameAr', 'ar');
-            if (_stopFlag) break;
-          }
-        } else if (_announceVerseOnly) {
-          if (mounted) {
-            setState(() {
-              _currentVerseNum = verse;
-              _phase = 'announcing';
-            });
-          }
-          await _speak('الآية $verse', 'ar');
-          if (_stopFlag) break;
+          String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : '$surah';
+          String announceUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=ar&client=tw-ob&q=${Uri.encodeComponent('سورة $surahNameAr')}';
+          sources.add(
+            AudioSource.uri(
+              Uri.parse(announceUrl),
+              headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'},
+              tag: MediaItem(
+                id: 'ann_\${surah}_\${verse}',
+                album: 'Sourate \${kSurahNames[surah - 1]}',
+                title: 'سورة $surahNameAr',
+                artist: 'Quran App',
+              ),
+            ),
+          );
         }
 
-        if (mounted) {
-          setState(() {
-            _currentVerseNum = verse;
-            _phase = 'reciting';
-          });
-        }
-
-        // Fetch arabic text (still online for text display)
-        try {
-          _arabicText = await fetchArabicText(surah, verse);
-          if (mounted) setState(() {});
-        } catch (e) {
-          if (mounted) setState(() => _arabicText = '(texte indisponible)');
-        }
-
-        await Future.delayed(const Duration(milliseconds: 200));
-        if (_stopFlag) break;
-
-        // Audio recitation (LOCAL CACHE)
+        // Verse Recitation
         if (withRecitation) {
-          await _playRecitation(surah, verse);
+          final url = getRecitationUrl(_reciter, surah, verse);
+          final surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
+          final reciterLabel = kReciters.firstWhere((r) => r['id'] == _reciter, orElse: () => {'label': _reciter})['label']!;
+          sources.add(
+            AudioSource.uri(
+              Uri.parse(url),
+              tag: MediaItem(
+                id: '$surah:$verse',
+                album: 'Sourate $surahName',
+                title: 'Verset $verse',
+                artist: reciterLabel,
+              ),
+            ),
+          );
         }
-
-        // Translation (still spoken by local TTS)
-        if (withTranslation && _speakTranslation) {
-          if (mounted) setState(() => _phase = 'translating');
-          String trText = await fetchTranslation(surah, verse, _lang);
-          if (mounted) setState(() => _translationText = trText);
-
-          if (trText.isNotEmpty && !_stopFlag) {
-            await _speak(trText, _lang);
-            if (_stopFlag) break;
-          }
-        } else {
-          if (mounted) setState(() => _translationText = '');
-        }
-
-        done++;
-        if (!infinite && mounted) setState(() => _progressDone = done);
       }
     }
 
-    if (mounted) {
-      setState(() {
-        _phase = _stopFlag ? 'idle' : 'done';
-        _isRunning = false;
-        _repeatIndex = 0;
-      });
+    if (sources.isEmpty) {
+      if (mounted) setState(() => _isRunning = false);
+      return;
+    }
+
+    final playlist = ConcatenatingAudioSource(children: sources);
+
+    final indexSub = _player.currentIndexStream.listen((index) {
+      if (index != null && index >= 0 && index < sources.length) {
+        final item = sources[index];
+        if (item is UriAudioSource && item.tag is MediaItem) {
+          final tag = item.tag as MediaItem;
+          if (mounted) {
+            setState(() {
+              _currentSurahName = tag.album ?? '';
+              if (!tag.id.startsWith('ann_')) {
+                final parts = tag.id.split(':');
+                if (parts.length == 2) {
+                  _currentVerseNum = int.tryParse(parts[1]) ?? 1;
+                }
+              }
+              _phase = tag.id.startsWith('ann_') ? 'announcing' : 'reciting';
+            });
+          }
+        }
+      }
+    });
+
+    try {
+      await _player.stop();
+      await _player.setAudioSource(playlist);
+      await _player.play();
+
+      await _player.processingStateStream.firstWhere(
+        (s) => s == ProcessingState.completed || _stopFlag,
+      );
+    } catch (e) {
+      debugPrint('Sequence execution error: $e');
+    } finally {
+      await indexSub.cancel();
+      if (mounted) {
+        setState(() {
+          _phase = 'idle';
+          _isRunning = false;
+        });
+      }
     }
   }
 
