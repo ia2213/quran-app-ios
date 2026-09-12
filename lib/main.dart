@@ -212,14 +212,33 @@ class QuranApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Lecture du Coran',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1B5E20)),
-          appBarTheme: const AppBarTheme(centerTitle: true, backgroundColor: Color(0xFF1B5E20), foregroundColor: Colors.white),
-          scaffoldBackgroundColor: const Color(0xFFF5F5F5),
-        ),
-        darkTheme: ThemeData.dark(useMaterial3: true),
         themeMode: ThemeMode.dark,
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          brightness: Brightness.dark,
+          scaffoldBackgroundColor: const Color(0xFF000000),
+          cardTheme: CardThemeData(
+            color: const Color(0xFF1C1C1E),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFF2C2C2E), width: 1),
+            ),
+          ),
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF10B981),
+            secondary: Color(0xFF059669),
+            surface: Color(0xFF1C1C1E),
+          ),
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            backgroundColor: Color(0xFF000000),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            titleTextStyle: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+        ),
         home: const QuranHome(),
       ),
     );
@@ -249,15 +268,29 @@ class _QuranHomeState extends State<QuranHome> {
           DownloadScreen(),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        backgroundColor: const Color(0xFF1A1A2E),
-        indicatorColor: const Color(0xFF1B5E20),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.book), label: 'Lecture'),
-          NavigationDestination(icon: Icon(Icons.download), label: 'Téléchargements'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1C1C1E),
+          border: Border(top: BorderSide(color: Color(0xFF2C2C2E), width: 0.5)),
+        ),
+        child: NavigationBar(
+          selectedIndex: _tab,
+          onDestinationSelected: (i) => setState(() => _tab = i),
+          backgroundColor: Colors.transparent,
+          indicatorColor: const Color(0xFF10B981).withOpacity(0.2),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.play_circle_outline, color: Colors.grey),
+              selectedIcon: Icon(Icons.play_circle_fill, color: Color(0xFF10B981)),
+              label: 'Lecture',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.cloud_download_outlined, color: Colors.grey),
+              selectedIcon: Icon(Icons.cloud_download, color: Color(0xFF10B981)),
+              label: 'Téléchargements',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -853,11 +886,16 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // -----------------------------------------------------------
 
   Widget _card(List<Widget> children) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1C1C1E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF2C2C2E), width: 1),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(children: children),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
       ),
     );
   }
@@ -875,19 +913,27 @@ class _RecitationScreenState extends State<RecitationScreen> {
   Widget _inputRow(String label, int value, int min, int max, Function(int) onChanged,
       {required TextEditingController ctrl}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w500))),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.white)),
           SizedBox(
-            width: 70,
+            width: 75,
+            height: 38,
             child: TextField(
               controller: ctrl,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  hintText: '1'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: const Color(0xFF2C2C2E),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              ),
               textAlign: TextAlign.center,
               onTap: () {
                 ctrl.selection = TextSelection(baseOffset: 0, extentOffset: ctrl.text.length);
@@ -913,36 +959,43 @@ class _RecitationScreenState extends State<RecitationScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Mode tabs
-          Row(
-            children: ['single', 'range', 'page', 'loop']
-                .map((m) => Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
-                        child: Material(
-                          color: _mode == m ? const Color(0xFF1B5E20) : Colors.grey.shade800,
-                          borderRadius: BorderRadius.circular(8),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () => setState(() => _mode = m),
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Center(
-                                child: Text(
-                                  m == 'single' ? 'Verset' : m == 'range' ? 'Plage' : m == 'page' ? 'Page' : 'Boucle',
-                                  style: TextStyle(
-                                    color: _mode == m ? Colors.white : Colors.grey,
-                                    fontWeight: _mode == m ? FontWeight.bold : FontWeight.normal,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ),
+          // iOS Segmented Mode Picker
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C1C1E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF2C2C2E), width: 1),
+            ),
+            child: Row(
+              children: ['single', 'range', 'page', 'loop'].map((m) {
+                final selected = _mode == m;
+                final label = m == 'single' ? 'Verset' : m == 'range' ? 'Plage' : m == 'page' ? 'Page' : 'Boucle';
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _mode = m),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected ? const Color(0xFF10B981) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Center(
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            color: selected ? Colors.white : Colors.grey.shade400,
+                            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                    ))
-                .toList(),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           ),
           const SizedBox(height: 12),
 
@@ -1097,32 +1150,38 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
           const SizedBox(height: 12),
 
-          // Buttons
+          // iOS Style Action Buttons
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                      backgroundColor: _isRunning ? Colors.grey : const Color(0xFF1B5E20)),
-                  onPressed: _isRunning ? null : _play,
-                  child: const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(
-                        child: Text('▶ Lancer',
-                            style: TextStyle(color: Colors.white, fontSize: 16))),
+                    backgroundColor: const Color(0xFF10B981),
+                    disabledBackgroundColor: const Color(0xFF1C1C1E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
                   ),
+                  onPressed: _isRunning ? null : _play,
+                  icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                  label: const Text('Lancer', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
-                  onPressed: _isRunning ? _stop : null,
-                  child: const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(
-                        child: Text('⏹ Arrêter', style: TextStyle(color: Colors.white, fontSize: 16))),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    disabledBackgroundColor: const Color(0xFF1C1C1E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
                   ),
+                  onPressed: _isRunning ? _stop : null,
+                  icon: const Icon(Icons.stop_rounded, size: 22),
+                  label: const Text('Arrêter', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -1171,75 +1230,97 @@ class _RecitationScreenState extends State<RecitationScreen> {
               ],
             ),
 
-          // Display
+          // Display (iOS Now Playing Quran Card)
           if (_arabicText.isNotEmpty || _isRunning)
-            _card([
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Chip(
-                    label: Text(_phase == 'idle'
-                        ? 'Prêt'
-                        : _phase == 'announcing'
-                            ? '🔊 Annonce'
-                            : _phase == 'reciting'
-                                ? '📖 Récitation'
-                                : '🌍 Traduction'),
-                    backgroundColor: _phase == 'reciting'
-                        ? Colors.green.shade100
-                        : _phase == 'announcing'
-                            ? Colors.blue.shade100
-                            : _phase == 'translating'
-                                ? Colors.orange.shade100
-                                : Colors.grey.shade100,
+            Container(
+              margin: const EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1C1C1E),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF10B981).withOpacity(0.08),
+                    blurRadius: 20,
+                    spreadRadius: 2,
                   ),
-                  Text('Répétition $_repeatIndex${_infiniteLoop ? ' (boucle)' : ''}'),
                 ],
               ),
-              if (_currentSurahName != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text('$_currentSurahName — verset $_currentVerseNum',
-                      style: const TextStyle(color: Colors.grey)),
-                ),
-              const SizedBox(height: 16),
-              Text(_arabicText,
-                  style: const TextStyle(fontSize: 28, fontFamily: 'Amiri', height: 2),
-                  textAlign: TextAlign.right),
-              if (_translationText.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                        color: Colors.blue.shade50, borderRadius: BorderRadius.circular(8)),
-                    child: Text(_translationText, style: const TextStyle(fontSize: 15)),
-                  ),
-                ),
-              if (_isPlaying || _isTtsPlaying)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(
-                        _isPlaying ? Icons.music_note : Icons.volume_up,
-                        color: _isPlaying ? Colors.green : Colors.blue,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _isPlaying ? 'Récitation...' : _isTtsPlaying ? 'Traduction TTS...' : '',
-                        style: TextStyle(
-                          color: _isPlaying ? Colors.green : Colors.blue,
-                          fontSize: 14,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _phase == 'reciting'
+                              ? const Color(0xFF10B981).withOpacity(0.15)
+                              : _phase == 'announcing'
+                                  ? Colors.blue.withOpacity(0.15)
+                                  : Colors.orange.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        child: Text(
+                          _phase == 'idle'
+                              ? 'Prêt'
+                              : _phase == 'announcing'
+                                  ? '🔊 Annonce'
+                                  : _phase == 'reciting'
+                                      ? '📖 Récitation'
+                                      : '🌍 Traduction',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _phase == 'reciting'
+                                ? const Color(0xFF10B981)
+                                : _phase == 'announcing'
+                                    ? Colors.blue
+                                    : Colors.orange,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Répétition $_repeatIndex${_infiniteLoop ? ' (∞)' : ''}',
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
                       ),
                     ],
                   ),
-                ),
-            ]),
+                  if (_currentSurahName != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      '$_currentSurahName — Verset $_currentVerseNum',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    _arabicText,
+                    style: const TextStyle(fontSize: 30, height: 1.8, color: Color(0xFFF9FAFB), fontWeight: FontWeight.w500),
+                    textAlign: TextAlign.center,
+                    textDirection: TextDirection.rtl,
+                  ),
+                  if (_translationText.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2C2C2E),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _translationText,
+                        style: const TextStyle(fontSize: 15, height: 1.4, color: Color(0xFFE5E7EB), fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.left,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );
