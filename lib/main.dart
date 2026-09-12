@@ -33,7 +33,7 @@ const kReciters = [
 
 const kSurahNames = [
   'Al-Faatiha','Al-Baqara','Aal-i-Imraan','An-Nisaa','Al-Maaida',
-  "Al-An'aam","Al-A'raaf","Al-Anfaal","At-Tawba","Yunus",
+  "Al-An'aam","Al-A'raaf","An-Anfaal","At-Tawba","Yunus",
   'Hud','Yusuf',"Ar-Ra'd","Ibrahim","Al-Hijr",
   'An-Nahl','Al-Israa','Al-Kahf','Maryam','Taa-Haa',
   'Al-Anbiyaa','Al-Hajj','Al-Muminoon','An-Noor','Al-Furqaan',
@@ -55,6 +55,21 @@ const kSurahNames = [
   'At-Takaathur','Al-Asr','Al-Humaza','Al-Fil','Quraish',
   "Al-Maa'un",'Al-Kawthar','Al-Kaafiroon','An-Nasr','Al-Masad',
   'Al-Ikhlaas','Al-Falaq','An-Naas',
+];
+
+const kSurahNamesArabic = [
+  'الفاتحة','البقرة','آل عمران','النساء','المائدة','الأنعام','الأعراف','الأنفال','التوبة','يونس',
+  'هود','يوسف','الرعد','إبراهيم','الحجر','النحل','الإسراء','الكهف','مريم','طه',
+  'الأنبياء','الحج','المؤمنون','النور','الفرقان','الشعراء','النمل','القصص','العنكبوت','الروم',
+  'لقمان','السجدة','الأحزاب','سبأ','فاطر','يس','الصافات','ص','الزمر','غافر',
+  'فصلت','الشورى','الزخرف','الدخان','الجاثية','الأحقاف','محمد','الفتح','الحجرات','ق',
+  'الذاريات','الطور','النجم','القمر','الرحمن','الواقعة','الحديد','المجادلة','الحشر','الممتحنة',
+  'الصف','الجمعة','المنافقون','التغابن','الطلاق','التحريم','الملك','القلم','الحاقة','المعارج',
+  'نوح','الجن','المزمل','المدثر','القيامة','الإنسان','المرسلات','النبأ','النازعات','عبس',
+  'التكوير','الإنفطار','المطففين','الإنشقاق','البروج','الطارق','الأعلى','الغاشية','الفجر','البلد',
+  'الشمس','الليل','الضحى','الشرح','التين','العلق','القدر','البينة','الزلزلة','العاديات',
+  'القارعة','التكاثر','العصر','الهمزة','الفيل','قريش','الماعون','الكوثر','الكافرون','النصر',
+  'المسد','الإخلاص','الفلق','الناس',
 ];
 
 const kAyahCounts = [
@@ -370,7 +385,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
             IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
             IosTextToSpeechAudioCategoryOptions.allowBluetooth,
             IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
-            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
           ],
           IosTextToSpeechAudioMode.defaultMode,
         );
@@ -691,6 +705,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
         // Announce surah name & initial verse ONCE when entering a new surah
         if (surah != lastSurah) {
           String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
+          String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : 'سورة $surah';
           lastSurah = surah;
 
           if (_announceSurahVerse) {
@@ -701,22 +716,17 @@ class _RecitationScreenState extends State<RecitationScreen> {
                 _phase = 'announcing';
               });
             }
-            final announceText = _lang == 'fr'
-                ? 'Sourate $surahName, verset $verse'
-                : 'Surah $surahName, verse $verse';
-            await _speak(announceText, _lang);
+            await _speak('سورة $surahNameAr', 'ar');
             if (_stopFlag) break;
           }
         } else if (_announceVerseOnly) {
-          // Announce verse number ONLY if option is enabled for subsequent verses
           if (mounted) {
             setState(() {
               _currentVerseNum = verse;
               _phase = 'announcing';
             });
           }
-          final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
-          await _speak(verseText, _lang);
+          await _speak('الآية $verse', 'ar');
           if (_stopFlag) break;
         }
 
