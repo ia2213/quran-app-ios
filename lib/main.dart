@@ -1,3 +1,4 @@
+import 'package:just_audio_background/just_audio_background.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -10,7 +11,19 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() => runApp(const QuranApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await JustAudioBackground.init(
+      androidNotificationChannelId: 'com.ia2213.quranapp.audio',
+      androidNotificationChannelName: 'Quran Recitation',
+      androidNotificationOngoing: true,
+    );
+  } catch (e) {
+    debugPrint('JustAudioBackground init error: $e');
+  }
+  runApp(const QuranApp());
+}
 
 // ============================================================
 // DATA
@@ -527,8 +540,21 @@ class _RecitationScreenState extends State<RecitationScreen> {
       final encoded = Uri.encodeComponent(cleanText);
       final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
+      final mediaTag = MediaItem(
+        id: 'tts_\${DateTime.now().millisecondsSinceEpoch}',
+        album: 'Annonce',
+        title: text,
+        artist: 'Quran App',
+      );
+
       await _player.stop();
-      await _player.setUrl(url, headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'});
+      await _player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(url),
+          headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'},
+          tag: mediaTag,
+        ),
+      );
       await _player.play();
       await _waitForPlayerStopped();
     } catch (e) {
@@ -573,12 +599,21 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
       await _player.stop();
 
+      final surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
+      final reciterLabel = kReciters.firstWhere((r) => r['id'] == _reciter, orElse: () => {'label': _reciter})['label']!;
+      final mediaTag = MediaItem(
+        id: '$surah:$verse',
+        album: 'Sourate $surahName',
+        title: 'Verset $verse',
+        artist: reciterLabel,
+      );
+
       if (await file.exists() && await file.length() > 0) {
         debugPrint('Recitation: playing from cache ${file.path}');
-        await _player.setFilePath(file.path);
+        await _player.setAudioSource(AudioSource.file(file.path, tag: mediaTag));
       } else {
         debugPrint('Recitation: streaming $url');
-        await _player.setUrl(url);
+        await _player.setAudioSource(AudioSource.uri(Uri.parse(url), tag: mediaTag));
         _backgroundCacheDownload(url, file);
       }
 
@@ -868,13 +903,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter voices by current language
-    final langFilter = _lang == 'fr' ? 'fr' : 'en';
-    final filteredVoices = _availableVoices.where((v) {
-      final locale = (v['locale'] as String?) ?? '';
-      return locale.toLowerCase().startsWith(langFilter);
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(title: const Text('Lecture du Coran')),
       body: ListView(
@@ -1035,42 +1063,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
             ),
             const SizedBox(height: 8),
 
-            // Voice dropdown
-            Row(
-              children: [
-                const Text('Voix TTS:'),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButton<Map<String, String>>(
-                    value: _selectedVoice.isNotEmpty ? _selectedVoice : null,
-                    hint: Text(filteredVoices.isNotEmpty ? 'Voix automatique' : 'Voix système / Web Auto',
-                        style: const TextStyle(fontSize: 12)),
-                    isExpanded: true,
-                    items: filteredVoices.map((v) {
-                      final name = v['name'] as String? ?? 'Unknown';
-                      final locale = v['locale'] as String? ?? '';
-                      final voiceMap = {
-                        'name': name,
-                        'locale': locale,
-                      };
-                      return DropdownMenuItem<Map<String, String>>(
-                        value: voiceMap,
-                        child: Text('$name ($locale)', style: const TextStyle(fontSize: 12)),
-                      );
-                    }).toList(),
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() { _selectedVoice = v; });
-                        _flutterTts.setVoice(_selectedVoice);
-                        _savePref('ttsVoiceName', _selectedVoice['name']);
-                        _savePref('ttsVoiceLocale', _selectedVoice['locale']);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
+
 
             // ---- RECITER ----
             Row(
