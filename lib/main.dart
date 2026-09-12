@@ -33,7 +33,7 @@ const kReciters = [
 
 const kSurahNames = [
   'Al-Faatiha','Al-Baqara','Aal-i-Imraan','An-Nisaa','Al-Maaida',
-  "Al-An'aam","Al-A'raaf","An-Anfaal","At-Tawba","Yunus",
+  "Al-An'aam","Al-A'raaf","Al-Anfaal","At-Tawba","Yunus",
   'Hud','Yusuf',"Ar-Ra'd","Ibrahim","Al-Hijr",
   'An-Nahl','Al-Israa','Al-Kahf','Maryam','Taa-Haa',
   'Al-Anbiyaa','Al-Hajj','Al-Muminoon','An-Noor','Al-Furqaan',
@@ -84,24 +84,6 @@ const kAyahCounts = [
 // HELPERS
 // ============================================================
 
-const kEveryAyahFolders = {
-  'ar.alafasy': 'Alafasy_128kbps',
-  'ar.husary': 'Husary_128kbps',
-  'ar.minshawi': 'Minshawy_Murattal_128kbps',
-  'ar.abdulbasitmurattal': 'Abdul_Basit_Murattal_192kbps',
-  'ar.abdulsamad': 'Abdul_Basit_Mujawwad_128kbps',
-  'ar.shaatree': 'Abu_Bakr_Ash-Shaatree_128kbps',
-  'ar.abdurrahmansudais': 'Abdurrahmaan_As-Sudais_192kbps',
-  'ar.hudhaifi': 'Hudhaify_128kbps',
-};
-
-String getRecitationUrl(String reciter, int surah, int verse) {
-  final folder = kEveryAyahFolders[reciter] ?? 'Alafasy_128kbps';
-  final s = surah.toString().padLeft(3, '0');
-  final v = verse.toString().padLeft(3, '0');
-  return 'https://everyayah.com/data/$folder/$s$v.mp3';
-}
-
 /// Build recitation filename for local cache
 String recitationFilename(String reciter, int surah, int verse) {
   return '${reciter.replaceAll('.', '_')}_${surah.toString().padLeft(3, '0')}_${verse.toString().padLeft(3, '0')}.mp3';
@@ -109,7 +91,16 @@ String recitationFilename(String reciter, int surah, int verse) {
 
 /// Get recitation audio URL from API
 Future<String?> fetchRecitationUrl(String reciter, int surah, int verse) async {
-  return getRecitationUrl(reciter, surah, verse);
+  try {
+    final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$reciter'));
+    if (r.statusCode == 200) {
+      final d = json.decode(r.body) as Map<String, dynamic>;
+      return d['data']['audio'] as String?;
+    }
+  } catch (e) {
+    debugPrint('fetchRecitationUrl error: $e');
+  }
+  return null;
 }
 
 /// Download and cache a recitation MP3
@@ -318,6 +309,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   // Audio players - recitation + TTS
   final _player = AudioPlayer();
+  final _ttsPlayer = AudioPlayer();
   bool _isPlaying = false;
 
   // Local TTS
@@ -384,6 +376,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
             IosTextToSpeechAudioCategoryOptions.defaultToSpeaker,
             IosTextToSpeechAudioCategoryOptions.allowBluetooth,
             IosTextToSpeechAudioCategoryOptions.allowBluetoothA2DP,
+            IosTextToSpeechAudioCategoryOptions.mixWithOthers,
           ],
           IosTextToSpeechAudioMode.defaultMode,
         );
@@ -518,48 +511,133 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // LOCAL TTS
   // -----------------------------------------------------------
 
-  Future<void> _speak(String text, String lang) async {
-    if (text.isEmpty || _stopFlag) return;
+  Future<void> _waitForTtsPlayerStopped() async {
     try {
-      if (mounted) setState(() => _isTtsPlaying = true);
-      final cleanText = text.replaceAll(RegExp(r'[()]'), '');
-      final tl = lang == 'ar' ? 'ar' : (lang == 'fr' ? 'fr' : 'en');
-      final encoded = Uri.encodeComponent(cleanText);
-      final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
-
-      await _player.stop();
-      await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(url),
-          headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'},
-        ),
+      await _ttsPlayer.processingStateStream.firstWhere(
+        (s) => s == ProcessingState.completed || s == ProcessingState.idle || _stopFlag,
       );
-      await _player.play();
-      await _waitForPlayerStopped();
     } catch (e) {
-      debugPrint('TTS Audio error: $e');
-    } finally {
-      if (mounted) setState(() => _isTtsPlaying = false);
+      debugPrint('Wait TTS error: $e');
     }
   }
 
+  Future<void> _speak(String text, String lang) async {
+    if (text.isEmpty || _stopFlag) return;
+
+    bool spokeNatively = false;
+    try {
+      _ttsCompleter = Completer<void>();
+      final ttsLang = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
+      await _flutterTts.setLanguage(ttsLang);
+
+      if (_selectedVoice.isNotEmpty) {
+        try {
+          await _flutterTts.setVoice(_selectedVoice);
+        } catch (_) {}
+      }
+
+      if (mounted) setState(() => _isTtsPlaying = true);
+      final res = await _flutterTts.speak(text);
+      if (res == 1 || res == true) {
+        await _ttsCompleter!.future.timeout(
+          const Duration(seconds: 4),
+          onTimeout: () {
+            _flutterTts.stop();
+            debugPrint('TTS native timeout (4s), falling back to HTTP');
+          },
+        );
+        spokeNatively = true;
+      }
+    } catch (e) {
+      debugPrint('Native TTS error: $e');
+    }
+
+    if (!spokeNatively && !_stopFlag) {
+      try {
+        if (mounted) setState(() => _isTtsPlaying = true);
+        final cleanText = text.replaceAll(RegExp(r'[()]'), '');
+        final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
+        final encoded = Uri.encodeComponent(cleanText);
+        final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
+
+        await _ttsPlayer.stop();
+        await _ttsPlayer.setUrl(url);
+        await _ttsPlayer.play();
+        await _waitForTtsPlayerStopped();
+      } catch (e) {
+        debugPrint('HTTP TTS error: $e');
+        await Future.delayed(const Duration(milliseconds: 400));
+      }
+    }
+
+    if (mounted) setState(() => _isTtsPlaying = false);
+  }
+
   // -----------------------------------------------------------
-  // RECITATION PLAYBACK (with local cache + direct CDN)
+  // RECITATION PLAYBACK (with local cache)
   // -----------------------------------------------------------
 
   Future<void> _waitForPlayerStopped() async {
     try {
-      // 1. Wait until player leaves idle/loading state
       await _player.processingStateStream.firstWhere(
-        (s) => s == ProcessingState.buffering || s == ProcessingState.ready || s == ProcessingState.completed || _stopFlag,
-      ).timeout(const Duration(seconds: 5), onTimeout: () => ProcessingState.idle);
-
-      // 2. Wait until player completes playback (native iOS AVPlayer event)
-      await _player.processingStateStream.firstWhere(
-        (s) => s == ProcessingState.completed || _stopFlag,
-      ).timeout(const Duration(seconds: 90), onTimeout: () => ProcessingState.completed);
+        (s) => s == ProcessingState.completed || s == ProcessingState.idle || _stopFlag,
+      );
     } catch (e) {
       debugPrint('Wait player error: $e');
+    }
+  }
+
+  Future<void> _playRecitation(int surah, int verse) async {
+    if (_stopFlag) return;
+    try {
+      if (_cacheDir == null) {
+        _cacheDir = Directory('${(await getApplicationDocumentsDirectory()).path}/recitations');
+        if (!await _cacheDir!.exists()) await _cacheDir!.create(recursive: true);
+      }
+
+      final filename = recitationFilename(_reciter, surah, verse);
+      final file = File('${_cacheDir!.path}/$filename');
+
+      if (await file.exists()) {
+        // Play from local cache
+        debugPrint('Recitation: playing from cache ${file.path}');
+        await _player.setFilePath(file.path);
+      } else {
+        // Download and play
+        final url = await fetchRecitationUrl(_reciter, surah, verse);
+        if (url == null) {
+          debugPrint('Recitation: no URL for $surah:$verse');
+          return;
+        }
+        debugPrint('Recitation: downloading $url');
+        try {
+          final client = http.Client();
+          final request = http.Request('GET', Uri.parse(url));
+          final response = await client.send(request);
+          if (response.statusCode == 200) {
+            final bytes = await response.stream.toBytes();
+            await file.writeAsBytes(bytes);
+            debugPrint('Recitation: saved to cache ${file.path}');
+            await _player.setFilePath(file.path);
+          } else {
+            debugPrint('Recitation: download failed ${response.statusCode}');
+            return;
+          }
+          client.close();
+        } catch (e) {
+          debugPrint('Recitation download error: $e');
+          return;
+        }
+      }
+
+      if (!_stopFlag && mounted) {
+        await _player.play();
+        debugPrint('Recitation: started playback');
+        await _waitForPlayerStopped();
+        debugPrint('Recitation: done');
+      }
+    } catch (e) {
+      debugPrint('Recitation error: $e');
     }
   }
 
@@ -612,59 +690,97 @@ class _RecitationScreenState extends State<RecitationScreen> {
       {int repeats = 3, bool infinite = false, bool withTranslation = true, bool withRecitation = true}) async {
     _stopFlag = false;
     _isRunning = true;
+    int done = 0;
+    int rep = 0;
     int lastSurah = -1;
 
-    List<AudioSource> sources = [];
+    while (!_stopFlag && (infinite || rep < repeats)) {
+      rep++;
+      if (mounted) setState(() => _repeatIndex = rep);
 
-    for (int rep = 0; rep < (infinite ? 999 : repeats); rep++) {
       for (var ref in seq) {
+        if (_stopFlag) break;
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        if (surah != lastSurah && _announceSurahVerse) {
-          lastSurah = surah;
+        // Announce surah name & initial verse ONCE when entering a new surah
+        if (surah != lastSurah) {
+          String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
           String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : '$surah';
-          String announceUrl = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=ar&client=tw-ob&q=${Uri.encodeComponent('سورة $surahNameAr')}';
-          sources.add(
-            AudioSource.uri(
-              Uri.parse(announceUrl),
-              headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'},
-            ),
-          );
+          lastSurah = surah;
+
+          if (_announceSurahVerse) {
+            if (mounted) {
+              setState(() {
+                _currentSurahName = surahName;
+                _currentVerseNum = verse;
+                _phase = 'announcing';
+              });
+            }
+            await _speak('سورة $surahNameAr', 'ar');
+            if (_stopFlag) break;
+          }
+        } else if (_announceVerseOnly) {
+          // Announce verse number ONLY if option is enabled for subsequent verses
+          if (mounted) {
+            setState(() {
+              _currentVerseNum = verse;
+              _phase = 'announcing';
+            });
+          }
+          final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
+          await _speak(verseText, _lang);
+          if (_stopFlag) break;
         }
 
+        if (mounted) {
+          setState(() {
+            _currentVerseNum = verse;
+            _phase = 'reciting';
+          });
+        }
+
+        // Fetch arabic text (still online for text display)
+        try {
+          _arabicText = await fetchArabicText(surah, verse);
+          if (mounted) setState(() {});
+        } catch (e) {
+          if (mounted) setState(() => _arabicText = '(texte indisponible)');
+        }
+
+        await Future.delayed(const Duration(milliseconds: 200));
+        if (_stopFlag) break;
+
+        // Audio recitation (LOCAL CACHE)
         if (withRecitation) {
-          final url = getRecitationUrl(_reciter, surah, verse);
-          sources.add(AudioSource.uri(Uri.parse(url)));
+          await _playRecitation(surah, verse);
         }
+
+        // Translation (still spoken by local TTS)
+        if (withTranslation && _speakTranslation) {
+          if (mounted) setState(() => _phase = 'translating');
+          String trText = await fetchTranslation(surah, verse, _lang);
+          if (mounted) setState(() => _translationText = trText);
+
+          if (trText.isNotEmpty && !_stopFlag) {
+            await _speak(trText, _lang);
+            if (_stopFlag) break;
+          }
+        } else {
+          if (mounted) setState(() => _translationText = '');
+        }
+
+        done++;
+        if (!infinite && mounted) setState(() => _progressDone = done);
       }
     }
 
-    if (sources.isEmpty) {
-      if (mounted) setState(() => _isRunning = false);
-      return;
-    }
-
-    final playlist = ConcatenatingAudioSource(children: sources);
-
-    try {
-      await _player.stop();
-      await _player.setAudioSource(playlist);
-      await _player.play();
-
-      await _player.processingStateStream.firstWhere(
-        (s) => s == ProcessingState.completed || _stopFlag,
-      );
-    } catch (e) {
-      debugPrint('Sequence execution error: $e');
-      if (mounted) setState(() => _error = 'Erreur lecture: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _phase = 'idle';
-          _isRunning = false;
-        });
-      }
+    if (mounted) {
+      setState(() {
+        _phase = _stopFlag ? 'idle' : 'done';
+        _isRunning = false;
+        _repeatIndex = 0;
+      });
     }
   }
 
@@ -790,6 +906,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   @override
   Widget build(BuildContext context) {
+
+
     return Scaffold(
       appBar: AppBar(title: const Text('Lecture du Coran')),
       body: ListView(
