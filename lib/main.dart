@@ -520,22 +520,59 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Future<void> _speak(String text, String lang) async {
     if (text.isEmpty || _stopFlag) return;
-    try {
-      if (mounted) setState(() => _isTtsPlaying = true);
-      final cleanText = text.replaceAll(RegExp(r'[()]'), '');
-      final tl = lang == 'ar' ? 'ar' : (lang == 'fr' ? 'fr' : 'en');
-      final encoded = Uri.encodeComponent(cleanText);
-      final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
-      await _player.stop();
-      await _player.setUrl(url, headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'});
-      await _player.play();
-      await _waitForPlayerStopped();
+    bool spokeNatively = false;
+
+    // 1. Try native FlutterTts with system voice selection
+    try {
+      _ttsCompleter = Completer<void>();
+      final ttsLang = lang == 'ar' ? 'ar-SA' : (lang == 'fr' ? 'fr-FR' : 'en-US');
+      await _flutterTts.setLanguage(ttsLang);
+
+      if (_selectedVoice.isNotEmpty && _selectedVoice['locale'] != null) {
+        final loc = _selectedVoice['locale']!.toLowerCase();
+        if (loc.startsWith(lang)) {
+          try {
+            await _flutterTts.setVoice(_selectedVoice);
+          } catch (_) {}
+        }
+      }
+
+      if (mounted) setState(() => _isTtsPlaying = true);
+      final res = await _flutterTts.speak(text);
+      if (res == 1 || res == true) {
+        await _ttsCompleter!.future.timeout(
+          const Duration(milliseconds: 1800),
+          onTimeout: () {
+            _flutterTts.stop();
+            debugPrint('Native TTS timeout, falling back to HTTP');
+          },
+        );
+        spokeNatively = true;
+      }
     } catch (e) {
-      debugPrint('TTS Audio error: $e');
-    } finally {
-      if (mounted) setState(() => _isTtsPlaying = false);
+      debugPrint('Native TTS error: $e');
     }
+
+    // 2. Fallback to HTTP TTS on _player if native failed
+    if (!spokeNatively && !_stopFlag) {
+      try {
+        if (mounted) setState(() => _isTtsPlaying = true);
+        final cleanText = text.replaceAll(RegExp(r'[()]'), '');
+        final tl = lang == 'ar' ? 'ar' : (lang == 'fr' ? 'fr' : 'en');
+        final encoded = Uri.encodeComponent(cleanText);
+        final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
+
+        await _player.stop();
+        await _player.setUrl(url, headers: {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)'});
+        await _player.play();
+        await _waitForPlayerStopped();
+      } catch (e) {
+        debugPrint('HTTP TTS error: $e');
+      }
+    }
+
+    if (mounted) setState(() => _isTtsPlaying = false);
   }
 
   // -----------------------------------------------------------
@@ -543,11 +580,12 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // -----------------------------------------------------------
 
   Future<void> _waitForPlayerStopped() async {
-    for (int i = 0; i < 300; i++) {
-      if (_stopFlag) return;
-      final ps = _player.processingState;
-      if (ps == ProcessingState.completed || ps == ProcessingState.idle) return;
-      await Future.delayed(const Duration(milliseconds: 150));
+    try {
+      await _player.processingStateStream.firstWhere(
+        (state) => state == ProcessingState.completed || state == ProcessingState.idle || _stopFlag,
+      );
+    } catch (e) {
+      debugPrint('Wait player error: $e');
     }
   }
 
