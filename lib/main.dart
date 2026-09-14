@@ -166,11 +166,26 @@ class AppState extends ChangeNotifier {
   bool _surahLoading = false;
   String _reciter = 'ar.alafasy';
   String _translationLang = 'fr';
+  bool _isDarkMode = true;
 
   List<Map<String, dynamic>> get surahs => _surahs;
   bool get surahLoading => _surahLoading;
   String get reciter => _reciter;
   String get translationLang => _translationLang;
+  bool get isDarkMode => _isDarkMode;
+
+  Future<void> loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    _isDarkMode = prefs.getBool('isDarkMode') ?? true;
+    notifyListeners();
+  }
+
+  void toggleTheme(bool val) async {
+    _isDarkMode = val;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isDarkMode', val);
+  }
 
   Future<void> loadSurahs() async {
     _surahLoading = true;
@@ -209,38 +224,66 @@ class QuranApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => AppState()..loadSurahs(),
-      child: MaterialApp(
-        title: 'Lecture du Coran',
-        debugShowCheckedModeBanner: false,
-        themeMode: ThemeMode.dark,
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: const Color(0xFF000000),
-          cardTheme: CardThemeData(
-            color: const Color(0xFF1C1C1E),
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: const BorderSide(color: Color(0xFF2C2C2E), width: 1),
+      create: (_) => AppState()..loadSurahs()..loadTheme(),
+      child: Consumer<AppState>(
+        builder: (context, appState, _) {
+          return MaterialApp(
+            title: 'Coran',
+            debugShowCheckedModeBanner: false,
+            themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            theme: ThemeData(
+              useMaterial3: true,
+              brightness: Brightness.light,
+              scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+              cardTheme: CardThemeData(
+                color: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
+                ),
+              ),
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF2563EB),
+                surface: Colors.white,
+              ),
+              appBarTheme: const AppBarTheme(
+                centerTitle: true,
+                backgroundColor: Color(0xFFF9FAFB),
+                foregroundColor: Color(0xFF111827),
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+              ),
             ),
-          ),
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF10B981),
-            secondary: Color(0xFF059669),
-            surface: Color(0xFF1C1C1E),
-          ),
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            backgroundColor: Color(0xFF000000),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            scrolledUnderElevation: 0,
-            titleTextStyle: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
-        ),
-        home: const QuranHome(),
+            darkTheme: ThemeData(
+              useMaterial3: true,
+              brightness: Brightness.dark,
+              scaffoldBackgroundColor: const Color(0xFF000000),
+              cardTheme: CardThemeData(
+                color: const Color(0xFF1C1C1E),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: const BorderSide(color: Color(0xFF2C2C2E), width: 1),
+                ),
+              ),
+              colorScheme: const ColorScheme.dark(
+                primary: Color(0xFF3B82F6),
+                surface: Color(0xFF1C1C1E),
+              ),
+              appBarTheme: const AppBarTheme(
+                centerTitle: true,
+                backgroundColor: Color(0xFF000000),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+            home: const QuranHome(),
+          );
+        },
       ),
     );
   }
@@ -261,6 +304,9 @@ class _QuranHomeState extends State<QuranHome> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
       body: IndexedStack(
         index: _tab,
@@ -270,24 +316,24 @@ class _QuranHomeState extends State<QuranHome> {
         ],
       ),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1C1C1E),
-          border: Border(top: BorderSide(color: Color(0xFF2C2C2E), width: 0.5)),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+          border: Border(top: BorderSide(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB), width: 0.5)),
         ),
         child: NavigationBar(
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
           backgroundColor: Colors.transparent,
-          indicatorColor: const Color(0xFF10B981).withOpacity(0.2),
-          destinations: const [
+          indicatorColor: primaryColor.withOpacity(0.15),
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.play_circle_outline, color: Colors.grey),
-              selectedIcon: Icon(Icons.play_circle_fill, color: Color(0xFF10B981)),
+              icon: const Icon(Icons.play_circle_outline, color: Colors.grey),
+              selectedIcon: Icon(Icons.play_circle_fill, color: primaryColor),
               label: 'Lecture',
             ),
             NavigationDestination(
-              icon: Icon(Icons.cloud_download_outlined, color: Colors.grey),
-              selectedIcon: Icon(Icons.cloud_download, color: Color(0xFF10B981)),
+              icon: const Icon(Icons.cloud_download_outlined, color: Colors.grey),
+              selectedIcon: Icon(Icons.cloud_download, color: primaryColor),
               label: 'Téléchargements',
             ),
           ],
@@ -887,23 +933,28 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // -----------------------------------------------------------
 
   Widget _card(List<Widget> children) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1C1C1E).withOpacity(0.65),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-          ),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB),
+          width: 1,
         ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
     );
   }
 
@@ -919,22 +970,23 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Widget _inputRow(String label, int value, int min, int max, Function(int) onChanged,
       {required TextEditingController ctrl}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: Colors.white)),
+          Text(label, style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF111827))),
           SizedBox(
             width: 75,
             height: 38,
             child: TextField(
               controller: ctrl,
               keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: const Color(0xFF2C2C2E),
+                fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
@@ -959,46 +1011,31 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   @override
   Widget build(BuildContext context) {
-
+    final appState = Provider.of<AppState>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Lecture du Coran')),
-      body: Stack(
-        children: [
-          Positioned(
-            top: -40,
-            left: -30,
-            child: Container(
-              width: 240,
-              height: 240,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF10B981).withOpacity(0.18),
-              ),
-            ),
+      appBar: AppBar(
+        title: const Text('Lecture du Coran'),
+        actions: [
+          IconButton(
+            icon: Icon(appState.isDarkMode ? Icons.wb_sunny_outlined : Icons.nightlight_round),
+            tooltip: appState.isDarkMode ? 'Passer en mode clair' : 'Passer en mode sombre',
+            onPressed: () => appState.toggleTheme(!appState.isDarkMode),
           ),
-          Positioned(
-            top: 220,
-            right: -50,
-            child: Container(
-              width: 260,
-              height: 260,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFF6366F1).withOpacity(0.15),
-              ),
-            ),
-          ),
-          ListView(
+        ],
+      ),
+      body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // iOS Segmented Mode Picker
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF1C1C1E),
+              color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFE5E7EB),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2C2C2E), width: 1),
+              border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFD1D5DB), width: 1),
             ),
             child: Row(
               children: ['single', 'range', 'page', 'loop'].map((m) {
@@ -1011,14 +1048,17 @@ class _RecitationScreenState extends State<RecitationScreen> {
                       duration: const Duration(milliseconds: 150),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: selected ? const Color(0xFF10B981) : Colors.transparent,
+                        color: selected ? primaryColor : Colors.transparent,
                         borderRadius: BorderRadius.circular(9),
+                        boxShadow: selected && !isDark
+                            ? [BoxShadow(color: primaryColor.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
+                            : null,
                       ),
                       child: Center(
                         child: Text(
                           label,
                           style: TextStyle(
-                            color: selected ? Colors.white : Colors.grey.shade400,
+                            color: selected ? Colors.white : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
                             fontWeight: selected ? FontWeight.bold : FontWeight.w500,
                             fontSize: 13,
                           ),
@@ -1189,8 +1229,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    disabledBackgroundColor: const Color(0xFF1C1C1E),
+                    backgroundColor: primaryColor,
+                    disabledBackgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1206,7 +1246,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEF4444),
-                    disabledBackgroundColor: const Color(0xFF1C1C1E),
+                    disabledBackgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1360,26 +1400,32 @@ class _RecitationScreenState extends State<RecitationScreen> {
                         const SizedBox(height: 18),
                         Text(
                           _arabicText,
-                          style: const TextStyle(fontSize: 32, height: 1.8, color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            fontSize: 30,
+                            height: 1.8,
+                            color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF111827),
+                            fontWeight: FontWeight.w600,
+                          ),
                           textAlign: TextAlign.center,
                           textDirection: TextDirection.rtl,
                         ),
                         if (_translationText.isNotEmpty) ...[
                           const SizedBox(height: 18),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2C2C2E).withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _translationText,
+                              style: TextStyle(
+                                fontSize: 15,
+                                height: 1.4,
+                                color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+                                fontStyle: FontStyle.italic,
                               ),
-                              child: Text(
-                                _translationText,
-                                style: const TextStyle(fontSize: 15, height: 1.4, color: Color(0xFFE5E7EB), fontStyle: FontStyle.italic),
-                                textAlign: TextAlign.left,
-                              ),
+                              textAlign: TextAlign.left,
                             ),
                           ),
                         ],
@@ -1390,8 +1436,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
               ),
             ),
         ],
-      ),
-      ],
       ),
     );
   }
