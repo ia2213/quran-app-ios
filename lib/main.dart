@@ -820,15 +820,13 @@ class _RecitationScreenState extends State<RecitationScreen> {
           });
         }
 
-        // Fetch arabic text (still online for text display)
-        try {
-          _arabicText = await fetchArabicText(surah, verse);
-          if (mounted) setState(() {});
-        } catch (e) {
-          if (mounted) setState(() => _arabicText = '(texte indisponible)');
-        }
+        // Asynchronous Arabic text fetch (non-blocking so audio never pauses on lock screen)
+        fetchArabicText(surah, verse).then((text) {
+          if (mounted && text.isNotEmpty) {
+            setState(() => _arabicText = text);
+          }
+        }).catchError((_) {});
 
-        await Future.delayed(const Duration(milliseconds: 200));
         if (_stopFlag) break;
 
         // Audio recitation (LOCAL CACHE)
