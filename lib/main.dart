@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -888,14 +889,20 @@ class _RecitationScreenState extends State<RecitationScreen> {
   Widget _card(List<Widget> children) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C1C1E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2C2C2E), width: 1),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1C1C1E).withOpacity(0.65),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+          ),
+        ),
       ),
     );
   }
@@ -956,7 +963,33 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Lecture du Coran')),
-      body: ListView(
+      body: Stack(
+        children: [
+          Positioned(
+            top: -40,
+            left: -30,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF10B981).withOpacity(0.18),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 220,
+            right: -50,
+            child: Container(
+              width: 260,
+              height: 260,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF6366F1).withOpacity(0.15),
+              ),
+            ),
+          ),
+          ListView(
         padding: const EdgeInsets.all(16),
         children: [
           // iOS Segmented Mode Picker
@@ -1230,98 +1263,135 @@ class _RecitationScreenState extends State<RecitationScreen> {
               ],
             ),
 
-          // Display (iOS Now Playing Quran Card)
+          // Display (iOS Liquid Glass Now Playing Quran Card)
           if (_arabicText.isNotEmpty || _isRunning)
             Container(
               margin: const EdgeInsets.only(top: 16),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1C1C1E),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF10B981).withOpacity(0.08),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _phase == 'reciting'
-                              ? const Color(0xFF10B981).withOpacity(0.15)
-                              : _phase == 'announcing'
-                                  ? Colors.blue.withOpacity(0.15)
-                                  : Colors.orange.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                  child: Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1C1E).withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withOpacity(0.12),
+                          blurRadius: 30,
+                          spreadRadius: 4,
                         ),
-                        child: Text(
-                          _phase == 'idle'
-                              ? 'Prêt'
-                              : _phase == 'announcing'
-                                  ? '🔊 Annonce'
-                                  : _phase == 'reciting'
-                                      ? '📖 Récitation'
-                                      : '🌍 Traduction',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _phase == 'reciting'
-                                ? const Color(0xFF10B981)
-                                : _phase == 'announcing'
-                                    ? Colors.blue
-                                    : Colors.orange,
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _phase == 'reciting'
+                                    ? const Color(0xFF10B981).withOpacity(0.2)
+                                    : _phase == 'announcing'
+                                        ? Colors.blue.withOpacity(0.2)
+                                        : Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: _phase == 'reciting'
+                                      ? const Color(0xFF10B981).withOpacity(0.4)
+                                      : Colors.transparent,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: _phase == 'reciting'
+                                          ? const Color(0xFF10B981)
+                                          : _phase == 'announcing'
+                                              ? Colors.blue
+                                              : Colors.orange,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _phase == 'idle'
+                                        ? 'Prêt'
+                                        : _phase == 'announcing'
+                                            ? '🔊 Annonce'
+                                            : _phase == 'reciting'
+                                                ? '📖 Récitation'
+                                                : '🌍 Traduction',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: _phase == 'reciting'
+                                          ? const Color(0xFF10B981)
+                                          : _phase == 'announcing'
+                                              ? Colors.blue
+                                              : Colors.orange,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              'Répétition $_repeatIndex${_infiniteLoop ? ' (∞)' : ''}',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                        if (_currentSurahName != null) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            '$_currentSurahName — Verset $_currentVerseNum',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981), letterSpacing: 0.3),
+                            textAlign: TextAlign.center,
                           ),
+                        ],
+                        const SizedBox(height: 18),
+                        Text(
+                          _arabicText,
+                          style: const TextStyle(fontSize: 32, height: 1.8, color: Color(0xFFFFFFFF), fontWeight: FontWeight.w600),
+                          textAlign: TextAlign.center,
+                          textDirection: TextDirection.rtl,
                         ),
-                      ),
-                      Text(
-                        'Répétition $_repeatIndex${_infiniteLoop ? ' (∞)' : ''}',
-                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  if (_currentSurahName != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      '$_currentSurahName — Verset $_currentVerseNum',
-                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
-                      textAlign: TextAlign.center,
+                        if (_translationText.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2C2C2E).withOpacity(0.8),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: Colors.white.withOpacity(0.08), width: 1),
+                              ),
+                              child: Text(
+                                _translationText,
+                                style: const TextStyle(fontSize: 15, height: 1.4, color: Color(0xFFE5E7EB), fontStyle: FontStyle.italic),
+                                textAlign: TextAlign.left,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 16),
-                  Text(
-                    _arabicText,
-                    style: const TextStyle(fontSize: 30, height: 1.8, color: Color(0xFFF9FAFB), fontWeight: FontWeight.w500),
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.rtl,
                   ),
-                  if (_translationText.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2C2C2E),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _translationText,
-                        style: const TextStyle(fontSize: 15, height: 1.4, color: Color(0xFFE5E7EB), fontStyle: FontStyle.italic),
-                        textAlign: TextAlign.left,
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
         ],
+      ),
+      ],
       ),
     );
   }
