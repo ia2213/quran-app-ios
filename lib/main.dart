@@ -427,7 +427,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
     try {
       final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration(
+      await session.configure(AudioSessionConfiguration(
         avAudioSessionCategory: AVAudioSessionCategory.playback,
         avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.allowBluetooth |
             AVAudioSessionCategoryOptions.allowBluetoothA2dp |
