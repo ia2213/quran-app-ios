@@ -874,10 +874,9 @@ class _RecitationScreenState extends State<RecitationScreen> {
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        // Announce surah name & initial verse ONCE when entering a new surah
+        // Announce surah name ONLY when entering a new surah
         if (surah != lastSurah) {
           String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
-          String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : '$surah';
           lastSurah = surah;
 
           if (mounted) {
@@ -891,12 +890,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
           if (_announceSurahVerse) {
             if (mounted) setState(() => _phase = 'announcing');
-            await _speak('سورة $surahNameAr', 'ar');
-            await _waitForTtsPlayerStopped();
-            if (_stopFlag) break;
-
-            final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
-            await _speak(verseText, _lang);
+            final surahText = _lang == 'fr' ? 'Sourate $surahName' : 'Surah $surahName';
+            await _speak(surahText, _lang);
             await _waitForTtsPlayerStopped();
             if (_stopFlag) break;
           }
