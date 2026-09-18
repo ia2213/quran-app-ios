@@ -617,48 +617,53 @@ class _RecitationScreenState extends State<RecitationScreen> {
     }
   }
 
+  Future<void> _skipTo(int surah, int verse) async {
+    _stop();
+    _mode = 'single';
+    _singleSurah = surah.clamp(1, 114);
+    int maxV = kAyahCounts[_singleSurah - 1];
+    _singleVerse = verse.clamp(1, maxV);
+    _syncControllers();
+
+    await Future.delayed(const Duration(milliseconds: 250));
+    if (mounted) {
+      setState(() {
+        _arabicText = '';
+        _transliterationText = '';
+        _translationText = '';
+        _currentSurahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
+        _currentVerseNum = _singleVerse;
+      });
+      _play();
+    }
+  }
+
   void _nextVerse() {
     int maxV = kAyahCounts[_singleSurah - 1];
     if (_singleVerse < maxV) {
-      _singleVerse++;
+      _skipTo(_singleSurah, _singleVerse + 1);
     } else if (_singleSurah < 114) {
-      _singleSurah++;
-      _singleVerse = 1;
+      _skipTo(_singleSurah + 1, 1);
     }
-    _syncControllers();
-    _stop();
-    Future.delayed(const Duration(milliseconds: 150), () => _play());
   }
 
   void _prevVerse() {
     if (_singleVerse > 1) {
-      _singleVerse--;
+      _skipTo(_singleSurah, _singleVerse - 1);
     } else if (_singleSurah > 1) {
-      _singleSurah--;
-      _singleVerse = kAyahCounts[_singleSurah - 1];
+      _skipTo(_singleSurah - 1, kAyahCounts[_singleSurah - 2]);
     }
-    _syncControllers();
-    _stop();
-    Future.delayed(const Duration(milliseconds: 150), () => _play());
   }
 
   void _nextSurah() {
     if (_singleSurah < 114) {
-      _singleSurah++;
-      _singleVerse = 1;
-      _syncControllers();
-      _stop();
-      Future.delayed(const Duration(milliseconds: 150), () => _play());
+      _skipTo(_singleSurah + 1, 1);
     }
   }
 
   void _prevSurah() {
     if (_singleSurah > 1) {
-      _singleSurah--;
-      _singleVerse = 1;
-      _syncControllers();
-      _stop();
-      Future.delayed(const Duration(milliseconds: 150), () => _play());
+      _skipTo(_singleSurah - 1, 1);
     }
   }
 
@@ -870,37 +875,41 @@ class _RecitationScreenState extends State<RecitationScreen> {
           String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : '$surah';
           lastSurah = surah;
 
+          if (mounted) {
+            setState(() {
+              _currentSurahName = surahName;
+              _currentVerseNum = verse;
+            });
+          }
+
           if (_announceSurahVerse) {
-            if (mounted) {
-              setState(() {
-                _currentSurahName = surahName;
-                _currentVerseNum = verse;
-                _phase = 'announcing';
-              });
-            }
+            if (mounted) setState(() => _phase = 'announcing');
             await _speak('سورة $surahNameAr', 'ar');
+            await _waitForTtsPlayerStopped();
             if (_stopFlag) break;
 
-            // Announce initial verse number at start of surah
             final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
             await _speak(verseText, _lang);
+            await _waitForTtsPlayerStopped();
             if (_stopFlag) break;
           }
         } else if (_announceVerseOnly) {
-          // Announce verse number ONLY if option is enabled for subsequent verses
           if (mounted) {
             setState(() {
+              _currentSurahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
               _currentVerseNum = verse;
               _phase = 'announcing';
             });
           }
           final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
           await _speak(verseText, _lang);
+          await _waitForTtsPlayerStopped();
           if (_stopFlag) break;
         }
 
         if (mounted) {
           setState(() {
+            _currentSurahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
             _currentVerseNum = verse;
             _phase = 'reciting';
           });
