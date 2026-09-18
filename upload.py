@@ -13,7 +13,7 @@ out_dir = 'C:/Users/Marc Hopf/quran-app-ios/build_artifacts'
 os.makedirs(out_dir, exist_ok=True)
 zip_path = os.path.join(out_dir, 'artifact.zip')
 
-res_info = subprocess.run(['curl.exe', '-s', '-H', f'Authorization: token {token}', 'https://api.github.com/repos/ia2213/quran-app-ios/actions/runs/35371193213/artifacts'], capture_output=True, text=True)
+res_info = subprocess.run(['curl.exe', '-s', '-H', f'Authorization: token {token}', 'https://api.github.com/repos/ia2213/quran-app-ios/actions/runs/35375121855/artifacts'], capture_output=True, text=True)
 art_id = json.loads(res_info.stdout)['artifacts'][0]['id']
 
 subprocess.run(['curl.exe', '-sL', '-H', f'Authorization: token {token}', '-H', 'Accept: application/vnd.github+json', f'https://api.github.com/repos/ia2213/quran-app-ios/actions/artifacts/{art_id}/zip', '-o', zip_path])

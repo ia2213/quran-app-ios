@@ -406,6 +406,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
   bool _showTranslation = true;
   bool _showFullScreenPlayer = false;
   bool _wasPlayingBeforeInterruption = false;
+  int _lastAnnouncedSurah = -1;
   int _repeatIndex = 0;
   int _progressDone = 0;
   int _progressTotal = 0;
@@ -603,6 +604,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   void _stop() {
     _stopFlag = true;
+    _lastAnnouncedSurah = -1;
     _player.stop();
     _flutterTts.stop();
     if (_ttsCompleter != null && !_ttsCompleter!.isCompleted) {
@@ -863,7 +865,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
     _isRunning = true;
     int done = 0;
     int rep = 0;
-    int lastSurah = -1;
 
     while (!_stopFlag && (infinite || rep < repeats)) {
       rep++;
@@ -874,10 +875,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        // Announce surah name ONLY when entering a new surah
-        if (surah != lastSurah) {
+        // Announce surah name ONLY when changing surahs
+        if (surah != _lastAnnouncedSurah) {
           String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
-          lastSurah = surah;
+          _lastAnnouncedSurah = surah;
 
           if (mounted) {
             setState(() {
