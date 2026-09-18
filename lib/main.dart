@@ -398,6 +398,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
   bool _showArabic = true;
   bool _showTransliteration = true;
   bool _showTranslation = true;
+  bool _showFullScreenPlayer = false;
   bool _wasPlayingBeforeInterruption = false;
   int _repeatIndex = 0;
   int _progressDone = 0;
@@ -608,6 +609,61 @@ class _RecitationScreenState extends State<RecitationScreen> {
         _repeatIndex = 0;
       });
     }
+  }
+
+  void _nextVerse() {
+    int maxV = kAyahCounts[_singleSurah - 1];
+    if (_singleVerse < maxV) {
+      _singleVerse++;
+    } else if (_singleSurah < 114) {
+      _singleSurah++;
+      _singleVerse = 1;
+    }
+    _syncControllers();
+    _stop();
+    Future.delayed(const Duration(milliseconds: 150), () => _play());
+  }
+
+  void _prevVerse() {
+    if (_singleVerse > 1) {
+      _singleVerse--;
+    } else if (_singleSurah > 1) {
+      _singleSurah--;
+      _singleVerse = kAyahCounts[_singleSurah - 1];
+    }
+    _syncControllers();
+    _stop();
+    Future.delayed(const Duration(milliseconds: 150), () => _play());
+  }
+
+  void _nextSurah() {
+    if (_singleSurah < 114) {
+      _singleSurah++;
+      _singleVerse = 1;
+      _syncControllers();
+      _stop();
+      Future.delayed(const Duration(milliseconds: 150), () => _play());
+    }
+  }
+
+  void _prevSurah() {
+    if (_singleSurah > 1) {
+      _singleSurah--;
+      _singleVerse = 1;
+      _syncControllers();
+      _stop();
+      Future.delayed(const Duration(milliseconds: 150), () => _play());
+    }
+  }
+
+  void _togglePausePlay() {
+    if (_player.playing) {
+      _player.pause();
+      _ttsPlayer.pause();
+    } else {
+      _player.play();
+    }
+    setState(() {});
   }
 
   // -----------------------------------------------------------
@@ -896,6 +952,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
         _progressDone = 0;
         _phase = 'announcing';
         _isRunning = true;
+        _showFullScreenPlayer = true;
       });
     }
     try {
@@ -1029,11 +1086,286 @@ class _RecitationScreenState extends State<RecitationScreen> {
   }
 
   // -----------------------------------------------------------
+  // FULL SCREEN MUSIC PLAYER VIEW
+  // -----------------------------------------------------------
+
+  Widget _buildFullScreenPlayer(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final isPlaying = _player.playing || _ttsPlayer.playing;
+
+    return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32),
+          onPressed: () => setState(() => _showFullScreenPlayer = false),
+          tooltip: 'Réduire',
+        ),
+        title: Column(
+          children: [
+            Text(
+              _currentSurahName ?? 'Sourate $_singleSurah',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            Text(
+              'Verset ${_currentVerseNum ?? _singleVerse}',
+              style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        centerTitle: true,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: _phase == 'reciting'
+                  ? const Color(0xFF10B981)
+                  : (_phase == 'announcing' ? Colors.blue : Colors.orange),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Text(
+                _phase == 'idle'
+                    ? 'Prêt'
+                    : (_phase == 'announcing' ? '🔊 Annonce' : (_phase == 'reciting' ? '📖 Récitation' : '🌍 Traduction')),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Option Toggles (Arabe, Phonétique, Traduction)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FilterChip(
+                    label: const Text('Arabe', style: TextStyle(fontSize: 12)),
+                    selected: _showArabic,
+                    onSelected: (v) => setState(() => _showArabic = v),
+                    selectedColor: primaryColor,
+                    labelStyle: TextStyle(color: _showArabic ? Colors.white : null),
+                  ),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: const Text('Phonétique', style: TextStyle(fontSize: 12)),
+                    selected: _showTransliteration,
+                    onSelected: (v) => setState(() => _showTransliteration = v),
+                    selectedColor: primaryColor,
+                    labelStyle: TextStyle(color: _showTransliteration ? Colors.white : null),
+                  ),
+                  const SizedBox(width: 8),
+                  FilterChip(
+                    label: const Text('Traduction', style: TextStyle(fontSize: 12)),
+                    selected: _showTranslation,
+                    onSelected: (v) => setState(() => _showTranslation = v),
+                    selectedColor: primaryColor,
+                    labelStyle: TextStyle(color: _showTranslation ? Colors.white : null),
+                  ),
+                ],
+              ),
+            ),
+
+            // Scrollable Verse Display
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    if (_showArabic && _arabicText.isNotEmpty) ...[
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: _phase == 'reciting'
+                              ? const Color(0xFF10B981)
+                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: _phase == 'reciting'
+                                ? const Color(0xFF10B981)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _phase == 'reciting'
+                                  ? const Color(0xFF10B981)
+                                  : Colors.black,
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _arabicText,
+                          style: TextStyle(
+                            fontSize: 32,
+                            height: 1.9,
+                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
+                            fontWeight: FontWeight.w700,
+                          ),
+                          textAlign: TextAlign.center,
+                          textDirection: TextDirection.rtl,
+                        ),
+                      ),
+                    ],
+
+                    if (_showTransliteration && _transliterationText.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _transliterationText,
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+
+                    if (_showTranslation && _translationText.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _translationText,
+                          style: TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                            color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
+                          ),
+                          textAlign: TextAlign.left,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+
+            // Music Player Control Dock
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black,
+                    blurRadius: 20,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_progressTotal > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: LinearProgressIndicator(
+                        value: _progressTotal > 0 ? _progressDone / _progressTotal : 0,
+                        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                        color: primaryColor,
+                      ),
+                    ),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.skip_previous_rounded, size: 34),
+                        tooltip: 'Sourate précédente',
+                        onPressed: _prevSurah,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.fast_rewind_rounded, size: 30),
+                        tooltip: 'Verset précédent',
+                        onPressed: _prevVerse,
+                      ),
+                      FloatingActionButton.large(
+                        onPressed: _togglePausePlay,
+                        backgroundColor: primaryColor,
+                        elevation: 4,
+                        child: Icon(
+                          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                          size: 44,
+                          color: Colors.white,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.fast_forward_rounded, size: 30),
+                        tooltip: 'Verset suivant',
+                        onPressed: _nextVerse,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.skip_next_rounded, size: 34),
+                        tooltip: 'Sourate suivante',
+                        onPressed: _nextSurah,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  SizedBox(
+                    width: 140,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEF4444),
+                        side: const BorderSide(color: Color(0xFFEF4444)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                      onPressed: () {
+                        _stop();
+                        setState(() => _showFullScreenPlayer = false);
+                      },
+                      icon: const Icon(Icons.stop_rounded, size: 18),
+                      label: const Text('Arrêter', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // -----------------------------------------------------------
   // BUILD
   // -----------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
+    if (_showFullScreenPlayer) {
+      return _buildFullScreenPlayer(context);
+    }
+
     final appState = Provider.of<AppState>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
