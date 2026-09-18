@@ -22,14 +22,20 @@ const kBase = 'https://api.alquran.cloud/v1';
 const kReciters = [
   {'id': 'ar.alafasy', 'label': 'Mishary Rashid Al-Afasy'},
   {'id': 'ar.husary', 'label': 'Mahmoud Khalil Al-Husary'},
+  {'id': 'ar.husarymujawwad', 'label': 'Mahmoud Khalil Al-Husary (Mujawwad)'},
   {'id': 'ar.minshawi', 'label': 'Mohamed Siddiq El-Minshawi'},
+  {'id': 'ar.minshawimujawwad', 'label': 'Mohamed Siddiq El-Minshawi (Mujawwad)'},
   {'id': 'ar.abdulbasitmurattal', 'label': 'Abdul Basit (Murattal)'},
-  {'id': 'ar.abdulsamad', 'label': 'Abdul Basit (Mujawwad)'},
-  {'id': 'ar.shaatree', 'label': 'Al-Shaatree'},
-  {'id': 'ar.abdurrahmansudais', 'label': 'Abdurrahman As-Sudais'},
-  {'id': 'ar.abdullahalmasmad', 'label': 'Abdullah Al-Masmad'},
-  {'id': 'ar.maabooralmoajil', 'label': 'Maabooralmoajil'},
-  {'id': 'ar.hudhaifi', 'label': 'Ali Al-Hudhaifi'},
+  {'id': 'ar.abdulbasitmujawwad', 'label': 'Abdul Basit (Mujawwad)'},
+  {'id': 'ar.shaatree', 'label': 'Abu Bakr Al-Shaatree'},
+  {'id': 'ar.abdurrahmaansudais', 'label': 'Abdurrahman As-Sudais'},
+  {'id': 'ar.saoodshuraym', 'label': 'Saood Al-Shuraym'},
+  {'id': 'ar.hudhaify', 'label': 'Ali Al-Hudhaify'},
+  {'id': 'ar.mahermuaiqly', 'label': 'Maher Al Muaiqly'},
+  {'id': 'ar.yasseraldossari', 'label': 'Yasser Al-Dossari'},
+  {'id': 'ar.ahmedajamy', 'label': 'Ahmed Al-Ajamy'},
+  {'id': 'ar.nasseralqatami', 'label': 'Nasser Al-Qatami'},
+  {'id': 'ar.hanirifai', 'label': 'Hani Ar-Rifai'},
 ];
 
 const kSurahNames = [
@@ -873,6 +879,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
               });
             }
             await _speak('سورة $surahNameAr', 'ar');
+            if (_stopFlag) break;
+
+            // Announce initial verse number at start of surah
+            final verseText = _lang == 'fr' ? 'Verset $verse' : 'Verse $verse';
+            await _speak(verseText, _lang);
             if (_stopFlag) break;
           }
         } else if (_announceVerseOnly) {

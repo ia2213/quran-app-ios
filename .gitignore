@@ -1,3 +1,6 @@
+artifact.zip
+build_artifacts/
+
 # Miscellaneous
 *.class
 *.log
