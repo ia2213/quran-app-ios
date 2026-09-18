@@ -890,8 +890,12 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
           if (_announceSurahVerse) {
             if (mounted) setState(() => _phase = 'announcing');
-            final surahText = _lang == 'fr' ? 'Sourate $surahName' : 'Surah $surahName';
-            await _speak(surahText, _lang);
+            String surahNameAr = (surah >= 1 && surah <= 114) ? kSurahNamesArabic[surah - 1] : '$surah';
+            String cleanNameAr = surahNameAr.endsWith('ة')
+                ? '${surahNameAr.substring(0, surahNameAr.length - 1)}ه'
+                : surahNameAr;
+            final annAr = 'سورة. $cleanNameAr';
+            await _speak(annAr, 'ar');
             await _waitForTtsPlayerStopped();
             if (_stopFlag) break;
           }
