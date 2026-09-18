@@ -157,6 +157,20 @@ Future<String> fetchTranslation(int surah, int verse, String lang) async {
   return '';
 }
 
+/// Fetch transliteration for an ayah
+Future<String> fetchTransliteration(int surah, int verse) async {
+  try {
+    final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/en.transliteration'));
+    if (r.statusCode == 200) {
+      final d = json.decode(r.body) as Map<String, dynamic>;
+      return d['data']['text'] as String? ?? '';
+    }
+  } catch (e) {
+    debugPrint('fetchTransliteration error: $e');
+  }
+  return '';
+}
+
 // ============================================================
 // APP STATE
 // ============================================================
@@ -380,6 +394,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
   int? _currentVerseNum;
   String _arabicText = '';
   String _translationText = '';
+  String _transliterationText = '';
+  bool _showArabic = true;
+  bool _showTransliteration = true;
+  bool _showTranslation = true;
+  bool _wasPlayingBeforeInterruption = false;
   int _repeatIndex = 0;
   int _progressDone = 0;
   int _progressTotal = 0;
@@ -432,11 +451,15 @@ class _RecitationScreenState extends State<RecitationScreen> {
       ));
       await session.setActive(true);
       session.interruptionEventStream.listen((event) {
-        debugPrint('Audio interruption: ${event.type}');
+        debugPrint('Audio interruption: begin=${event.begin}, type=${event.type}');
         if (event.begin) {
+          _wasPlayingBeforeInterruption = _isRunning && (_player.playing || _ttsPlayer.playing);
           _player.pause();
+          _ttsPlayer.pause();
         } else {
-          _player.play();
+          if (_wasPlayingBeforeInterruption && _isRunning && !_stopFlag) {
+            _player.play();
+          }
         }
       });
       session.becomingNoisyEventStream.listen((_) {
@@ -816,10 +839,16 @@ class _RecitationScreenState extends State<RecitationScreen> {
           });
         }
 
-        // Asynchronous Arabic text fetch (non-blocking so audio never pauses on lock screen)
+        // Asynchronous Arabic & Transliteration text fetch (non-blocking)
         fetchArabicText(surah, verse).then((text) {
           if (mounted && text.isNotEmpty) {
             setState(() => _arabicText = text);
+          }
+        }).catchError((_) {});
+
+        fetchTransliteration(surah, verse).then((text) {
+          if (mounted && text.isNotEmpty) {
+            setState(() => _transliterationText = text);
           }
         }).catchError((_) {});
 
@@ -1297,7 +1326,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
               ],
             ),
 
-          // Display (iOS Liquid Glass Now Playing Quran Card)
+          // Display (iOS Liquid Glass Now Playing Player Card)
           if (_arabicText.isNotEmpty || _isRunning)
             Container(
               margin: const EdgeInsets.only(top: 16),
@@ -1308,14 +1337,21 @@ class _RecitationScreenState extends State<RecitationScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(22),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1C1C1E).withOpacity(0.7),
+                      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.35), width: 1.5),
+                      border: Border.all(
+                        color: _phase == 'reciting'
+                            ? const Color(0xFF10B981)
+                            : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+                        width: 1.5,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF10B981).withOpacity(0.12),
-                          blurRadius: 30,
-                          spreadRadius: 4,
+                          color: _phase == 'reciting'
+                              ? const Color(0xFF10B981)
+                              : Colors.black,
+                          blurRadius: 25,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
@@ -1329,14 +1365,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                               decoration: BoxDecoration(
                                 color: _phase == 'reciting'
-                                    ? const Color(0xFF10B981).withOpacity(0.2)
+                                    ? const Color(0xFF10B981)
                                     : _phase == 'announcing'
-                                        ? Colors.blue.withOpacity(0.2)
-                                        : Colors.orange.withOpacity(0.2),
+                                        ? Colors.blue
+                                        : Colors.orange,
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: _phase == 'reciting'
-                                      ? const Color(0xFF10B981).withOpacity(0.4)
+                                      ? const Color(0xFF10B981)
                                       : Colors.transparent,
                                   width: 1,
                                 ),
@@ -1391,20 +1427,83 @@ class _RecitationScreenState extends State<RecitationScreen> {
                             textAlign: TextAlign.center,
                           ),
                         ],
-                        const SizedBox(height: 18),
-                        Text(
-                          _arabicText,
-                          style: TextStyle(
-                            fontSize: 30,
-                            height: 1.8,
-                            color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF111827),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          textAlign: TextAlign.center,
-                          textDirection: TextDirection.rtl,
+                        const SizedBox(height: 12),
+
+                        // Toggles mode lecture (Arabe, Phonétique, Traduction)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FilterChip(
+                              label: const Text('Arabe', style: TextStyle(fontSize: 11)),
+                              selected: _showArabic,
+                              onSelected: (v) => setState(() => _showArabic = v),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 6),
+                            FilterChip(
+                              label: const Text('Phonétique', style: TextStyle(fontSize: 11)),
+                              selected: _showTransliteration,
+                              onSelected: (v) => setState(() => _showTransliteration = v),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            const SizedBox(width: 6),
+                            FilterChip(
+                              label: const Text('Traduction', style: TextStyle(fontSize: 11)),
+                              selected: _showTranslation,
+                              onSelected: (v) => setState(() => _showTranslation = v),
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ],
                         ),
-                        if (_translationText.isNotEmpty) ...[
-                          const SizedBox(height: 18),
+
+                        if (_showArabic && _arabicText.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: _phase == 'reciting'
+                                  ? const Color(0xFF10B981)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Text(
+                              _arabicText,
+                              style: TextStyle(
+                                fontSize: 28,
+                                height: 1.8,
+                                color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF111827),
+                                fontWeight: FontWeight.w600,
+                              ),
+                              textAlign: TextAlign.center,
+                              textDirection: TextDirection.rtl,
+                            ),
+                          ),
+                        ],
+
+                        if (_showTransliteration && _transliterationText.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _transliterationText,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
+                                fontStyle: FontStyle.italic,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
+
+                        if (_showTranslation && _translationText.isNotEmpty) ...[
+                          const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
@@ -1417,7 +1516,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
                                 fontSize: 15,
                                 height: 1.4,
                                 color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
-                                fontStyle: FontStyle.italic,
                               ),
                               textAlign: TextAlign.left,
                             ),
