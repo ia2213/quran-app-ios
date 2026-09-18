@@ -390,11 +390,9 @@ class _RecitationScreenState extends State<RecitationScreen> {
   // Audio players - recitation + TTS
   final _player = AudioPlayer();
   final _ttsPlayer = AudioPlayer();
-  bool _isPlaying = false;
 
   // Local TTS
   final FlutterTts _flutterTts = FlutterTts();
-  bool _isTtsPlaying = false;
   Completer<void>? _ttsCompleter;
   Map<String, String> _selectedVoice = {}; // {'name': '...', 'locale': '...'}
   List<Map<String, dynamic>> _availableVoices = [];
@@ -420,9 +418,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
   }
 
   Future<void> _initAudio() async {
-    _player.playerStateStream.listen((state) {
-      if (mounted) setState(() => _isPlaying = state.playing);
-    });
     _player.setVolume(1.0);
 
     try {
@@ -488,7 +483,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         if (_ttsCompleter != null && !_ttsCompleter!.isCompleted) {
           _ttsCompleter!.complete();
         }
-        if (mounted) setState(() => _isTtsPlaying = false);
       });
 
       _flutterTts.setErrorHandler((msg) {
@@ -496,7 +490,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
         if (_ttsCompleter != null && !_ttsCompleter!.isCompleted) {
           _ttsCompleter!.complete();
         }
-        if (mounted) setState(() { _isTtsPlaying = false; _error = 'Erreur TTS: $msg'; });
+        if (mounted) setState(() { _error = 'Erreur TTS: $msg'; });
       });
 
       debugPrint('TTS initialized OK');
@@ -589,7 +583,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         _phase = 'idle';
         _isRunning = false;
         _repeatIndex = 0;
-        _isTtsPlaying = false;
       });
     }
   }
@@ -623,7 +616,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         } catch (_) {}
       }
 
-      if (mounted) setState(() => _isTtsPlaying = true);
       final res = await _flutterTts.speak(text);
       if (res == 1 || res == true) {
         await _ttsCompleter!.future.timeout(
@@ -641,7 +633,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
     if (!spokeNatively && !_stopFlag) {
       try {
-        if (mounted) setState(() => _isTtsPlaying = true);
         final cleanText = text.replaceAll(RegExp(r'[()]'), '');
         final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
         final encoded = Uri.encodeComponent(cleanText);
@@ -656,8 +647,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         await Future.delayed(const Duration(milliseconds: 400));
       }
     }
-
-    if (mounted) setState(() => _isTtsPlaying = false);
   }
 
   // -----------------------------------------------------------
