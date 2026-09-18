@@ -695,36 +695,41 @@ class _RecitationScreenState extends State<RecitationScreen> {
     if (text.isEmpty || _stopFlag) return;
 
     bool spokeNatively = false;
-    try {
-      _ttsCompleter = Completer<void>();
-      final ttsLang = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
-      await _flutterTts.setLanguage(ttsLang);
 
-      if (_selectedVoice.isNotEmpty) {
-        try {
-          await _flutterTts.setVoice(_selectedVoice);
-        } catch (_) {}
-      }
+    // Use native TTS for French/English if available
+    if (lang != 'ar') {
+      try {
+        _ttsCompleter = Completer<void>();
+        final ttsLang = lang == 'fr' ? 'fr-FR' : 'en-US';
+        await _flutterTts.setLanguage(ttsLang);
 
-      final res = await _flutterTts.speak(text);
-      if (res == 1 || res == true) {
-        await _ttsCompleter!.future.timeout(
-          const Duration(seconds: 4),
-          onTimeout: () {
-            _flutterTts.stop();
-            debugPrint('TTS native timeout (4s), falling back to HTTP');
-          },
-        );
-        spokeNatively = true;
+        if (_selectedVoice.isNotEmpty) {
+          try {
+            await _flutterTts.setVoice(_selectedVoice);
+          } catch (_) {}
+        }
+
+        final res = await _flutterTts.speak(text);
+        if (res == 1 || res == true) {
+          await _ttsCompleter!.future.timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              _flutterTts.stop();
+              debugPrint('TTS native timeout, falling back to HTTP');
+            },
+          );
+          spokeNatively = true;
+        }
+      } catch (e) {
+        debugPrint('Native TTS error: $e');
       }
-    } catch (e) {
-      debugPrint('Native TTS error: $e');
     }
 
+    // HTTP Google TTS is 100% reliable on iOS for Arabic & fallbacks
     if (!spokeNatively && !_stopFlag) {
       try {
         final cleanText = text.replaceAll(RegExp(r'[()]'), '');
-        final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar-SA' : 'en-US');
+        final tl = lang == 'fr' ? 'fr-FR' : (lang == 'ar' ? 'ar' : 'en-US');
         final encoded = Uri.encodeComponent(cleanText);
         final url = 'https://translate.google.com/translate_tts?ie=UTF-8&tl=$tl&client=tw-ob&q=$encoded';
 
@@ -877,6 +882,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
           if (mounted) {
             setState(() {
+              _singleSurah = surah;
+              _singleVerse = verse;
               _currentSurahName = surahName;
               _currentVerseNum = verse;
             });
@@ -896,6 +903,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
         } else if (_announceVerseOnly) {
           if (mounted) {
             setState(() {
+              _singleSurah = surah;
+              _singleVerse = verse;
               _currentSurahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
               _currentVerseNum = verse;
               _phase = 'announcing';
@@ -909,6 +918,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
         if (mounted) {
           setState(() {
+            _singleSurah = surah;
+            _singleVerse = verse;
             _currentSurahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
             _currentVerseNum = verse;
             _phase = 'reciting';
@@ -1006,10 +1017,15 @@ class _RecitationScreenState extends State<RecitationScreen> {
           debugPrint('Page fetch error: $e');
         }
       } else {
-        int surah = _singleSurah.clamp(1, 114);
-        int maxAyah = kAyahCounts[surah - 1];
-        int verse = _singleVerse.clamp(1, maxAyah);
-        seq.add({'surah': surah, 'verse': verse});
+        int startS = _singleSurah.clamp(1, 114);
+        int startV = _singleVerse.clamp(1, kAyahCounts[startS - 1]);
+        for (int s = startS; s <= 114; s++) {
+          int maxAyah = kAyahCounts[s - 1];
+          int vBegin = (s == startS) ? startV : 1;
+          for (int v = vBegin; v <= maxAyah; v++) {
+            seq.add({'surah': s, 'verse': v});
+          }
+        }
       }
 
       if (seq.isEmpty) {
