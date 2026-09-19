@@ -1,14 +1,9 @@
-name: iOS Build
+name: Build iOS & Android
 
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      altstore_url:
-        description: 'AltStore API URL (optional)'
-        required: false
-        default: ''
 
 jobs:
   build-ios:
@@ -38,23 +33,14 @@ jobs:
           cd ios
           pod install
 
-      - name: Build iOS IPA (proper signing)
+      - name: Build iOS IPA
         run: |
-          # Build with codesign for proper IPA structure
           flutter build ios --release --no-codesign
-          
-          # Package IPA properly
           APP_DIR=$(find build/ios/iphoneos -name "*.app" -type d | head -1)
-          echo "Found: $APP_DIR"
-          
           mkdir -p Payload
           cp -r "$APP_DIR" Payload/
-          
-          # Create proper IPA with correct structure
           zip -r -y quran-app.ipa Payload --symlinks
           rm -rf Payload
-          
-          echo "IPA created: $(ls -lh quran-app.ipa)"
       
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
@@ -62,26 +48,47 @@ jobs:
           name: quran-app-ios
           path: quran-app.ipa
           retention-days: 30
-          if-no-files-found: error
-      
-      - name: Print AltStore install instructions
+
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.4'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Android Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quran-app-android
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: Send APK to Telegram (Optional)
+        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}
         run: |
-          echo "## 📱 AltStore Installation Instructions" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Option 1: AltServer (Recommended)" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the IPA from the Artifacts section above" >> $GITHUB_STEP_SUMMARY
-          echo "2. Open AltStore on your iPhone" >> $GITHUB_STEP_SUMMARY
-          echo "3. Connect iPhone to Mac/PC" >> $GITHUB_STEP_SUMMARY
-          echo "4. In AltStore, tap '+' → select the IPA file" >> $GITHUB_STEP_SUMMARY
-          echo "5. Sign with your Apple ID (free account works)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Option 2: Sideloadly" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the IPA" >> $GITHUB_STEP_SUMMARY
-          echo "2. Open Sideloadly" >> $GITHUB_STEP_SUMMARY
-          echo "3. Connect iPhone → drag IPA into Sideloadly" >> $GITHUB_STEP_SUMMARY
-          echo "4. Click Start to install" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Option 3: AltStore via iCloud" >> $GITHUB_STEP_SUMMARY
-          echo "1. Download the IPA from Artifacts" >> $GITHUB_STEP_SUMMARY
-          echo "2. Open AltStore on iPhone" >> $GITHUB_STEP_SUMMARY
-          echo "3. My Apps → + → Import File → select IPA" >> $GITHUB_STEP_SUMMARY
+          zip -j quran-app-release.zip build/app/outputs/flutter-apk/app-release.apk
+          curl -F chat_id="856614939" \
+               -F document=@quran-app-release.zip \
+               -F caption="📱 *Quran App — Nouvel APK Android généré via GitHub Actions*" \
+               https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument

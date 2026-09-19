@@ -490,6 +490,13 @@ class _RecitationScreenState extends State<RecitationScreen> {
             AVAudioSessionCategoryOptions.allowAirPlay,
         avAudioSessionMode: AVAudioSessionMode.defaultMode,
         avAudioSessionRouteSharingPolicy: AVAudioSessionRouteSharingPolicy.defaultPolicy,
+        androidAudioAttributes: const AndroidAudioAttributes(
+          contentType: AndroidAudioContentType.music,
+          flags: AndroidAudioFlags.none,
+          usage: AndroidAudioUsage.media,
+        ),
+        androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+        androidWillPauseWhenDucked: true,
       ));
       await session.setActive(true);
       session.interruptionEventStream.listen((event) {
@@ -730,8 +737,9 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
         final res = await _flutterTts.speak(text);
         if (res == 1 || res == true) {
+          final timeoutSeconds = (text.length / 8).ceil().clamp(5, 60);
           await _ttsCompleter!.future.timeout(
-            const Duration(seconds: 3),
+            Duration(seconds: timeoutSeconds),
             onTimeout: () {
               _flutterTts.stop();
               debugPrint('TTS native timeout, falling back to HTTP');
