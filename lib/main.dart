@@ -91,12 +91,10 @@ const kAyahCounts = [
 // HELPERS
 // ============================================================
 
-/// Build recitation filename for local cache
 String recitationFilename(String reciter, int surah, int verse) {
   return '${reciter.replaceAll('.', '_')}_${surah.toString().padLeft(3, '0')}_${verse.toString().padLeft(3, '0')}.mp3';
 }
 
-/// Get recitation audio URL from API
 Future<String?> fetchRecitationUrl(String reciter, int surah, int verse) async {
   try {
     final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/$reciter'));
@@ -110,7 +108,6 @@ Future<String?> fetchRecitationUrl(String reciter, int surah, int verse) async {
   return null;
 }
 
-/// Download and cache a recitation MP3
 Future<File?> downloadRecitation(String reciter, int surah, int verse, Directory cacheDir) async {
   final filename = recitationFilename(reciter, surah, verse);
   final file = File('${cacheDir.path}/$filename');
@@ -134,7 +131,6 @@ Future<File?> downloadRecitation(String reciter, int surah, int verse, Directory
   return null;
 }
 
-/// Fetch arabic text for an ayah
 Future<String> fetchArabicText(int surah, int verse) async {
   try {
     final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/quran-uthmani'));
@@ -148,7 +144,6 @@ Future<String> fetchArabicText(int surah, int verse) async {
   return '';
 }
 
-/// Fetch translation for an ayah
 Future<String> fetchTranslation(int surah, int verse, String lang) async {
   try {
     String trId = lang == 'fr' ? 'fr.hamidullah' : 'en.sahih';
@@ -163,7 +158,6 @@ Future<String> fetchTranslation(int surah, int verse, String lang) async {
   return '';
 }
 
-/// Fetch transliteration for an ayah
 Future<String> fetchTransliteration(int surah, int verse) async {
   try {
     final r = await http.get(Uri.parse('$kBase/ayah/$surah:$verse/en.transliteration'));
@@ -241,6 +235,7 @@ class AppState extends ChangeNotifier {
 
 class QuranApp extends StatelessWidget {
   const QuranApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -251,70 +246,105 @@ class QuranApp extends StatelessWidget {
             title: 'Coran',
             debugShowCheckedModeBanner: false,
             themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-            theme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.light,
-              scaffoldBackgroundColor: const Color(0xFFF9FAFB),
-              cardTheme: CardThemeData(
-                color: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFFE5E7EB), width: 1),
-                ),
-              ),
-              colorScheme: const ColorScheme.light(
-                primary: Color(0xFF2563EB),
-                surface: Colors.white,
-              ),
-              appBarTheme: const AppBarTheme(
-                centerTitle: true,
-                backgroundColor: Color(0xFFF9FAFB),
-                foregroundColor: Color(0xFF111827),
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
-              ),
-            ),
-            darkTheme: ThemeData(
-              useMaterial3: true,
-              brightness: Brightness.dark,
-              scaffoldBackgroundColor: const Color(0xFF000000),
-              cardTheme: CardThemeData(
-                color: const Color(0xFF1C1C1E),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: Color(0xFF2C2C2E), width: 1),
-                ),
-              ),
-              colorScheme: const ColorScheme.dark(
-                primary: Color(0xFF3B82F6),
-                surface: Color(0xFF1C1C1E),
-              ),
-              appBarTheme: const AppBarTheme(
-                centerTitle: true,
-                backgroundColor: Color(0xFF000000),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                scrolledUnderElevation: 0,
-                titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-            ),
+            theme: _lightTheme(),
+            darkTheme: _darkTheme(),
             home: const QuranHome(),
           );
         },
       ),
     );
   }
+
+  static ThemeData _lightTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFF5F5F7),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE5E7EB), width: 0.5),
+        ),
+      ),
+      colorScheme: const ColorScheme.light(
+        primary: Color(0xFF10B981),
+        secondary: Color(0xFF2563EB),
+        surface: Colors.white,
+        onSurface: Color(0xFF111827),
+      ),
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        backgroundColor: Color(0xFFF5F5F7),
+        foregroundColor: Color(0xFF111827),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+      ),
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF111827)),
+        bodyLarge: TextStyle(fontSize: 16, color: Color(0xFF111827)),
+        bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF374151)),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFFF5F5F7),
+        selectedItemColor: Color(0xFF10B981),
+        unselectedItemColor: Color(0xFF8E8E93),
+        type: BottomNavigationBarType.fixed,
+      ),
+    );
+  }
+
+  static ThemeData _darkTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF000000),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF1C1C1E),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF2C2C2E), width: 0.5),
+        ),
+      ),
+      colorScheme: const ColorScheme.dark(
+        primary: Color(0xFF10B981),
+        secondary: Color(0xFF3B82F6),
+        surface: Color(0xFF1C1C1E),
+        onSurface: Color(0xFFF9FAFB),
+      ),
+      appBarTheme: const AppBarTheme(
+        centerTitle: true,
+        backgroundColor: Color(0xFF000000),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white),
+      ),
+      textTheme: const TextTheme(
+        headlineMedium: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFFF9FAFB)),
+        bodyLarge: TextStyle(fontSize: 16, color: Color(0xFFF9FAFB)),
+        bodyMedium: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Color(0xFF1C1C1E),
+        selectedItemColor: Color(0xFF10B981),
+        unselectedItemColor: Color(0xFF636366),
+        type: BottomNavigationBarType.fixed,
+      ),
+    );
+  }
 }
 
 // ============================================================
-// HOME (tab navigation)
+// HOME
 // ============================================================
 
 class QuranHome extends StatefulWidget {
   const QuranHome({super.key});
+
   @override
   State<QuranHome> createState() => _QuranHomeState();
 }
@@ -324,9 +354,6 @@ class _QuranHomeState extends State<QuranHome> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-
     return Scaffold(
       body: IndexedStack(
         index: _tab,
@@ -337,23 +364,30 @@ class _QuranHomeState extends State<QuranHome> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          border: Border(top: BorderSide(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB), width: 0.5)),
+          color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF2C2C2E)
+                  : const Color(0xFFE5E7EB),
+              width: 0.5,
+            ),
+          ),
         ),
         child: NavigationBar(
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
           backgroundColor: Colors.transparent,
-          indicatorColor: primaryColor.withOpacity(0.15),
-          destinations: [
+          indicatorColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+          destinations: const [
             NavigationDestination(
-              icon: const Icon(Icons.play_circle_outline, color: Colors.grey),
-              selectedIcon: Icon(Icons.play_circle_fill, color: primaryColor),
+              icon: Icon(Icons.headphones_outlined),
+              selectedIcon: Icon(Icons.headphones),
               label: 'Lecture',
             ),
             NavigationDestination(
-              icon: const Icon(Icons.cloud_download_outlined, color: Colors.grey),
-              selectedIcon: Icon(Icons.cloud_download, color: primaryColor),
+              icon: Icon(Icons.download_outlined),
+              selectedIcon: Icon(Icons.download),
               label: 'Téléchargements',
             ),
           ],
@@ -369,19 +403,20 @@ class _QuranHomeState extends State<QuranHome> {
 
 class RecitationScreen extends StatefulWidget {
   const RecitationScreen({super.key});
+
   @override
   State<RecitationScreen> createState() => _RecitationScreenState();
 }
 
 class _RecitationScreenState extends State<RecitationScreen> {
-  // Mode: range, page, single, loop
+  // Mode
   String _mode = 'single';
 
-  // Range mode
+  // Range
   int _startSurah = 1, _startVerse = 1, _endSurah = 1, _endVerse = 7;
   int _pageNumber = 1;
 
-  // Single mode
+  // Single
   int _singleSurah = 1, _singleVerse = 1;
 
   // Options
@@ -414,14 +449,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
   bool _isRunning = false;
   bool _stopFlag = false;
 
-  // Audio players - recitation + TTS
+  // Audio
   final _player = AudioPlayer();
   final _ttsPlayer = AudioPlayer();
 
-  // Local TTS
+  // TTS
   final FlutterTts _flutterTts = FlutterTts();
   Completer<void>? _ttsCompleter;
-  Map<String, String> _selectedVoice = {}; // {'name': '...', 'locale': '...'}
+  Map<String, String> _selectedVoice = {};
   List<Map<String, dynamic>> _availableVoices = [];
 
   // Controllers
@@ -432,8 +467,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
   late final TextEditingController _pageNumberCtrl = TextEditingController(text: '1');
   late final TextEditingController _singleSurahCtrl = TextEditingController(text: '1');
   late final TextEditingController _singleVerseCtrl = TextEditingController(text: '1');
+  late final TextEditingController _verseInputCtrl = TextEditingController(text: '1');
 
-  // Cache directory
   Directory? _cacheDir;
 
   @override
@@ -446,7 +481,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Future<void> _initAudio() async {
     _player.setVolume(1.0);
-
     try {
       final session = await AudioSession.instance;
       await session.configure(AudioSessionConfiguration(
@@ -459,7 +493,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
       ));
       await session.setActive(true);
       session.interruptionEventStream.listen((event) {
-        debugPrint('Audio interruption: begin=${event.begin}, type=${event.type}');
         if (event.begin) {
           _wasPlayingBeforeInterruption = _isRunning && (_player.playing || _ttsPlayer.playing);
           _player.pause();
@@ -471,10 +504,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
         }
       });
       session.becomingNoisyEventStream.listen((_) {
-        debugPrint('Headphones disconnected');
         _player.pause();
       });
-      debugPrint('Audio session configured: music (background-ready)');
     } catch (e) {
       debugPrint('Audio session init error: $e');
     }
@@ -498,19 +529,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
 
-      // Load available voices
       final voices = await _flutterTts.getVoices;
       _availableVoices = List<Map<String, dynamic>>.from(
         voices.where((v) => v is Map).map((v) => Map<String, dynamic>.from(v))
       );
-      debugPrint('Available TTS voices: ${_availableVoices.length}');
 
-      // Load saved voice or pick defaults
       await _loadPrefs();
 
-      // Set completion handler
       _flutterTts.setCompletionHandler(() {
-        debugPrint('TTS: completion handler called');
         if (_ttsCompleter != null && !_ttsCompleter!.isCompleted) {
           _ttsCompleter!.complete();
         }
@@ -521,10 +547,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
         if (_ttsCompleter != null && !_ttsCompleter!.isCompleted) {
           _ttsCompleter!.complete();
         }
-        if (mounted) setState(() { _error = 'Erreur TTS: $msg'; });
       });
-
-      debugPrint('TTS initialized OK');
     } catch (e) {
       debugPrint('TTS init error: $e');
     }
@@ -540,13 +563,11 @@ class _RecitationScreenState extends State<RecitationScreen> {
       _speakRecitation = prefs.getBool('speakRecitation') ?? true;
       _repeatCount = prefs.getInt('repeatCount') ?? 1;
 
-      // Load cache dir
       _cacheDir = Directory('${(await getApplicationDocumentsDirectory()).path}/recitations');
       if (!await _cacheDir!.exists()) {
         await _cacheDir!.create(recursive: true);
       }
 
-      // Load voice selection
       final savedVoiceName = prefs.getString('ttsVoiceName') ?? '';
       final savedVoiceLocale = prefs.getString('ttsVoiceLocale') ?? '';
       if (savedVoiceName.isNotEmpty) {
@@ -590,7 +611,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
   void dispose() {
     _stopFlag = true;
     _player.stop();
-    // DO NOT dispose _player (known flutter bug)
     _flutterTts.stop();
     _startSurahCtrl.dispose();
     _startVerseCtrl.dispose();
@@ -599,6 +619,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
     _pageNumberCtrl.dispose();
     _singleSurahCtrl.dispose();
     _singleVerseCtrl.dispose();
+    _verseInputCtrl.dispose();
     super.dispose();
   }
 
@@ -679,9 +700,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
     setState(() {});
   }
 
-  // -----------------------------------------------------------
-  // LOCAL TTS
-  // -----------------------------------------------------------
+  // ---- TTS ----
 
   Future<void> _waitForTtsPlayerStopped() async {
     try {
@@ -695,10 +714,8 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
   Future<void> _speak(String text, String lang) async {
     if (text.isEmpty || _stopFlag) return;
-
     bool spokeNatively = false;
 
-    // Use native TTS for French/English if available
     if (lang != 'ar') {
       try {
         _ttsCompleter = Completer<void>();
@@ -727,7 +744,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
       }
     }
 
-    // HTTP Google TTS is 100% reliable on iOS for Arabic & fallbacks
     if (!spokeNatively && !_stopFlag) {
       try {
         final cleanText = text.replaceAll(RegExp(r'[()]'), '');
@@ -746,9 +762,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
     }
   }
 
-  // -----------------------------------------------------------
-  // RECITATION PLAYBACK (with local cache)
-  // -----------------------------------------------------------
+  // ---- RECITATION ----
 
   Future<void> _waitForPlayerStopped() async {
     try {
@@ -772,17 +786,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
       final file = File('${_cacheDir!.path}/$filename');
 
       if (await file.exists()) {
-        // Play from local cache
-        debugPrint('Recitation: playing from cache ${file.path}');
         await _player.setFilePath(file.path);
       } else {
-        // Download and play
         final url = await fetchRecitationUrl(_reciter, surah, verse);
-        if (url == null) {
-          debugPrint('Recitation: no URL for $surah:$verse');
-          return;
-        }
-        debugPrint('Recitation: downloading $url');
+        if (url == null) return;
         try {
           final client = http.Client();
           final request = http.Request('GET', Uri.parse(url));
@@ -790,11 +797,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
           if (response.statusCode == 200) {
             final bytes = await response.stream.toBytes();
             await file.writeAsBytes(bytes);
-            debugPrint('Recitation: saved to cache ${file.path}');
             await _player.setFilePath(file.path);
-          } else {
-            debugPrint('Recitation: download failed ${response.statusCode}');
-            return;
           }
           client.close();
         } catch (e) {
@@ -805,59 +808,14 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
       if (!_stopFlag && mounted) {
         await _player.play();
-        debugPrint('Recitation: started playback');
         await _waitForPlayerStopped();
-        debugPrint('Recitation: done');
       }
     } catch (e) {
       debugPrint('Recitation error: $e');
     }
   }
 
-  // -----------------------------------------------------------
-  // TEST BUTTONS
-  // -----------------------------------------------------------
-
-  Future<void> _testAudio() async {
-    _stopFlag = false;
-    try {
-      final filename = recitationFilename(_reciter, 1, 1);
-      final file = File('${_cacheDir?.path ?? ''}/$filename');
-      setState(() { _error = null; _phase = 'reciting'; });
-
-      if (await file.exists()) {
-        debugPrint('TEST: playing from cache');
-        await _player.setFilePath(file.path);
-      } else {
-        final url = 'https://verses.quran.gov/Alafasy/001001.mp3';
-        debugPrint('TEST: playing $url');
-        await _player.setUrl(url);
-      }
-      await _player.play();
-      await _waitForPlayerStopped();
-      debugPrint('TEST: done');
-      if (mounted) setState(() => _phase = 'idle');
-    } catch (e) {
-      debugPrint('TEST error: $e');
-      if (mounted) setState(() => _error = 'TEST erreur: $e');
-    }
-  }
-
-  Future<void> _testTts() async {
-    _stopFlag = false;
-    try {
-      setState(() { _error = null; _phase = 'announcing'; });
-      await _speak('Sourate Al-Fatiha, verset 1. Loué soit Dieu, maître de l\'univers', _lang);
-      if (mounted) setState(() => _phase = 'idle');
-    } catch (e) {
-      debugPrint('TEST TTS error: $e');
-      if (mounted) setState(() => _error = 'TEST TTS erreur: $e');
-    }
-  }
-
-  // -----------------------------------------------------------
-  // MAIN SEQUENCE
-  // -----------------------------------------------------------
+  // ---- SEQUENCE ----
 
   Future<void> _runSequence(List<Map<String, int>> seq,
       {int repeats = 3, bool infinite = false, bool withTranslation = true, bool withRecitation = true}) async {
@@ -875,7 +833,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         int surah = ref['surah']!;
         int verse = ref['verse']!;
 
-        // Announce surah name ONLY when changing surahs
         if (surah != _lastAnnouncedSurah) {
           String surahName = (surah >= 1 && surah <= 114) ? kSurahNames[surah - 1] : 'Sourate $surah';
           _lastAnnouncedSurah = surah;
@@ -926,7 +883,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
           });
         }
 
-        // Asynchronous Arabic & Transliteration text fetch (non-blocking)
         fetchArabicText(surah, verse).then((text) {
           if (mounted && text.isNotEmpty) {
             setState(() => _arabicText = text);
@@ -941,12 +897,10 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
         if (_stopFlag) break;
 
-        // Audio recitation (LOCAL CACHE)
         if (withRecitation) {
           await _playRecitation(surah, verse);
         }
 
-        // Translation (still spoken by local TTS)
         if (withTranslation && _speakTranslation) {
           if (mounted) setState(() => _phase = 'translating');
           String trText = await fetchTranslation(surah, verse, _lang);
@@ -1044,35 +998,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
     }
   }
 
-  // -----------------------------------------------------------
-  // UI HELPERS
-  // -----------------------------------------------------------
-
-  Widget _card(List<Widget> children) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB),
-          width: 1,
-        ),
-        boxShadow: isDark
-            ? null
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-    );
-  }
+  // ---- UI HELPERS ----
 
   void _syncControllers() {
     if (_startSurahCtrl.text != _startSurah.toString()) _startSurahCtrl.text = _startSurah.toString();
@@ -1082,32 +1008,53 @@ class _RecitationScreenState extends State<RecitationScreen> {
     if (_pageNumberCtrl.text != _pageNumber.toString()) _pageNumberCtrl.text = _pageNumber.toString();
     if (_singleSurahCtrl.text != _singleSurah.toString()) _singleSurahCtrl.text = _singleSurah.toString();
     if (_singleVerseCtrl.text != _singleVerse.toString()) _singleVerseCtrl.text = _singleVerse.toString();
+    if (_verseInputCtrl.text != _singleVerse.toString()) _verseInputCtrl.text = _singleVerse.toString();
   }
 
-  Widget _inputRow(String label, int value, int min, int max, Function(int) onChanged,
+  /// Build a nice input field
+  Widget _styledInput(String label, int value, int min, int max, Function(int) onChanged,
       {required TextEditingController ctrl}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? const Color(0xFF3A3A3C) : const Color(0xFFD1D5DB);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(fontWeight: FontWeight.w500, fontSize: 14, color: isDark ? Colors.white : const Color(0xFF111827))),
           SizedBox(
-            width: 75,
-            height: 38,
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: isDark ? const Color(0xFFE5E5EA) : const Color(0xFF374151),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 68,
+            height: 36,
             child: TextField(
               controller: ctrl,
               keyboardType: TextInputType.number,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isDark ? Colors.white : const Color(0xFF111827)),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF000000),
+              ),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderSide: BorderSide(color: borderColor),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: borderColor),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
               ),
               textAlign: TextAlign.center,
               onTap: () {
@@ -1121,288 +1068,446 @@ class _RecitationScreenState extends State<RecitationScreen> {
     );
   }
 
-  // -----------------------------------------------------------
-  // FULL SCREEN MUSIC PLAYER VIEW
-  // -----------------------------------------------------------
+  /// Surah dropdown with names
+  Widget _surahDropdown(int currentSurah, Function(int) onChanged,
+      {required TextEditingController ctrl}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor = isDark ? const Color(0xFF3A3A3C) : const Color(0xFFD1D5DB);
 
-  Widget _buildFullScreenPlayer(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(width: 100),
+        const SizedBox(width: 12),
+        SizedBox(
+          width: 200,
+          child: DropdownButtonFormField<int>(
+            value: currentSurah,
+            isExpanded: true,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            dropdownColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFFE5E5EA) : const Color(0xFF111827),
+            ),
+            items: List.generate(114, (i) => i + 1).map((s) {
+              return DropdownMenuItem(
+                value: s,
+                child: Text(
+                  '${s}. ${kSurahNames[s - 1]}',
+                  style: const TextStyle(fontSize: 13),
+                ),
+              );
+            }).toList(),
+            onChanged: (v) {
+              if (v != null) {
+                onChanged(v);
+                ctrl.text = v.toString();
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Preset buttons
+  Widget _presetButton(String label, String surahName, int surah, int verse, Color color) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: OutlinedButton(
+          onPressed: () {
+            setState(() {
+              _mode = 'single';
+              _singleSurah = surah;
+              _singleVerse = verse;
+              _currentSurahName = surahName;
+              _currentVerseNum = verse;
+              _syncControllers();
+            });
+          },
+          style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color.withOpacity(0.4)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            backgroundColor: color.withOpacity(0.08),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---- FULL SCREEN PLAYER ----
+
+  Widget _buildFullScreenPlayer(BuildContext context, AppState appState) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
     final isPlaying = _player.playing || _ttsPlayer.playing;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF0A0A0A) : const Color(0xFFF5F5F7),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32),
           onPressed: () => setState(() => _showFullScreenPlayer = false),
-          tooltip: 'Réduire',
         ),
         title: Column(
           children: [
             Text(
               _currentSurahName ?? 'Sourate $_singleSurah',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
-            Text(
-              'Verset ${_currentVerseNum ?? _singleVerse}',
-              style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.w600),
+            Row(
+              children: [
+                Text(
+                  'Verset ${_currentVerseNum ?? _singleVerse}',
+                  style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 8),
+                _phaseBadge(isDark, primaryColor),
+              ],
             ),
           ],
         ),
         centerTitle: true,
         actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: _phase == 'reciting'
-                  ? const Color(0xFF10B981)
-                  : (_phase == 'announcing' ? Colors.blue : Colors.orange),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Text(
-                _phase == 'idle'
-                    ? 'Prêt'
-                    : (_phase == 'announcing' ? '🔊 Annonce' : (_phase == 'reciting' ? '📖 Récitation' : '🌍 Traduction')),
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
-            ),
+          IconButton(
+            icon: Icon(appState.isDarkMode ? Icons.wb_sunny_outlined : Icons.nightlight_round),
+            onPressed: () => appState.toggleTheme(!appState.isDarkMode),
           ),
         ],
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Option Toggles (Arabe, Phonétique, Traduction)
+            // Toggle chips
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  FilterChip(
-                    label: const Text('Arabe', style: TextStyle(fontSize: 12)),
-                    selected: _showArabic,
-                    onSelected: (v) => setState(() => _showArabic = v),
-                    selectedColor: primaryColor,
-                    labelStyle: TextStyle(color: _showArabic ? Colors.white : null),
-                  ),
+                  _toggleChip('Arabe', _showArabic, primaryColor, isDark),
                   const SizedBox(width: 8),
-                  FilterChip(
-                    label: const Text('Phonétique', style: TextStyle(fontSize: 12)),
-                    selected: _showTransliteration,
-                    onSelected: (v) => setState(() => _showTransliteration = v),
-                    selectedColor: primaryColor,
-                    labelStyle: TextStyle(color: _showTransliteration ? Colors.white : null),
-                  ),
+                  _toggleChip('Phonétique', _showTransliteration, primaryColor, isDark),
                   const SizedBox(width: 8),
-                  FilterChip(
-                    label: const Text('Traduction', style: TextStyle(fontSize: 12)),
-                    selected: _showTranslation,
-                    onSelected: (v) => setState(() => _showTranslation = v),
-                    selectedColor: primaryColor,
-                    labelStyle: TextStyle(color: _showTranslation ? Colors.white : null),
-                  ),
+                  _toggleChip('Traduction', _showTranslation, primaryColor, isDark),
                 ],
               ),
             ),
 
-            // Scrollable Verse Display
+            // Verse display
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
                     if (_showArabic && _arabicText.isNotEmpty) ...[
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: _phase == 'reciting'
-                              ? const Color(0xFF10B981)
-                              : (isDark ? const Color(0xFF1E293B) : Colors.white),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: _phase == 'reciting'
-                                ? const Color(0xFF10B981)
-                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
-                            width: 1.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _phase == 'reciting'
-                                  ? const Color(0xFF10B981)
-                                  : Colors.black,
-                              blurRadius: 20,
-                              spreadRadius: 2,
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          _arabicText,
-                          style: TextStyle(
-                            fontSize: 32,
-                            height: 1.9,
-                            color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF0F172A),
-                            fontWeight: FontWeight.w700,
-                          ),
-                          textAlign: TextAlign.center,
-                          textDirection: TextDirection.rtl,
-                        ),
-                      ),
+                      _arabicVerseCard(isDark, primaryColor),
+                      const SizedBox(height: 20),
                     ],
-
                     if (_showTransliteration && _transliterationText.isNotEmpty) ...[
+                      _transliterationCard(isDark),
                       const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _transliterationText,
-                          style: TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                            fontStyle: FontStyle.italic,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
                     ],
-
                     if (_showTranslation && _translationText.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _translationText,
-                          style: TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            color: isDark ? const Color(0xFFE2E8F0) : const Color(0xFF334155),
-                          ),
-                          textAlign: TextAlign.left,
-                        ),
-                      ),
+                      _translationCard(isDark),
                     ],
                   ],
                 ),
               ),
             ),
 
-            // Music Player Control Dock
-            Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black,
-                    blurRadius: 20,
-                    offset: const Offset(0, -4),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_progressTotal > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: LinearProgressIndicator(
-                        value: _progressTotal > 0 ? _progressDone / _progressTotal : 0,
-                        backgroundColor: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                        color: primaryColor,
-                      ),
-                    ),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.skip_previous_rounded, size: 34),
-                        tooltip: 'Sourate précédente',
-                        onPressed: _prevSurah,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.fast_rewind_rounded, size: 30),
-                        tooltip: 'Verset précédent',
-                        onPressed: _prevVerse,
-                      ),
-                      FloatingActionButton.large(
-                        onPressed: _togglePausePlay,
-                        backgroundColor: primaryColor,
-                        elevation: 4,
-                        child: Icon(
-                          isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                          size: 44,
-                          color: Colors.white,
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.fast_forward_rounded, size: 30),
-                        tooltip: 'Verset suivant',
-                        onPressed: _nextVerse,
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.skip_next_rounded, size: 34),
-                        tooltip: 'Sourate suivante',
-                        onPressed: _nextSurah,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  SizedBox(
-                    width: 140,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444),
-                        side: const BorderSide(color: Color(0xFFEF4444)),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                      ),
-                      onPressed: () {
-                        _stop();
-                        setState(() => _showFullScreenPlayer = false);
-                      },
-                      icon: const Icon(Icons.stop_rounded, size: 18),
-                      label: const Text('Arrêter', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Control dock
+            _controlDock(isDark, primaryColor, isPlaying),
           ],
         ),
       ),
     );
   }
 
-  // -----------------------------------------------------------
-  // BUILD
-  // -----------------------------------------------------------
+  Widget _phaseBadge(bool isDark, Color primaryColor) {
+    final phaseColor = _phase == 'reciting'
+        ? const Color(0xFF10B981)
+        : (_phase == 'announcing' ? const Color(0xFF2563EB) : const Color(0xFFFF9500));
+    final phaseLabel = _phase == 'idle'
+        ? 'Prêt'
+        : (_phase == 'announcing' ? 'Annonce' : (_phase == 'reciting' ? 'Récitation' : 'Traduction'));
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: phaseColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        phaseLabel,
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _toggleChip(String label, bool selected, Color primary, bool isDark) {
+    return FilterChip(
+      label: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+      selected: selected,
+      onSelected: (v) => setState(() {
+        if (label == 'Arabe') _showArabic = v;
+        if (label == 'Phonétique') _showTransliteration = v;
+        if (label == 'Traduction') _showTranslation = v;
+      }),
+      selectedColor: primary,
+      checkmarkColor: Colors.white,
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+        fontWeight: FontWeight.w500,
+      ),
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+    );
+  }
+
+  Widget _arabicVerseCard(bool isDark, Color primaryColor) {
+    final isReciting = _phase == 'reciting';
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isReciting
+            ? const Color(0xFF10B981)
+            : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isReciting
+              ? const Color(0xFF10B981)
+              : (isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB)),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isReciting
+                ? const Color(0xFF10B981).withOpacity(0.3)
+                : Colors.black.withOpacity(0.08),
+            blurRadius: 24,
+            spreadRadius: isReciting ? 2 : 0,
+          ),
+        ],
+      ),
+      child: Text(
+        _arabicText,
+        style: TextStyle(
+          fontSize: 34,
+          height: 1.9,
+          color: isReciting
+              ? const Color(0xFF000000)
+              : (isDark ? const Color(0xFFF9FAFB) : const Color(0xFF0F172A)),
+          fontWeight: FontWeight.w700,
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.rtl,
+      ),
+    );
+  }
+
+  Widget _transliterationCard(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        _transliterationText,
+        style: TextStyle(
+          fontSize: 15,
+          height: 1.5,
+          color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF6B7280),
+          fontStyle: FontStyle.italic,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  Widget _translationCard(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        _translationText,
+        style: TextStyle(
+          fontSize: 15,
+          height: 1.5,
+          color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+        ),
+        textAlign: TextAlign.left,
+      ),
+    );
+  }
+
+  Widget _controlDock(bool isDark, Color primaryColor, bool isPlaying) {
+    final reciterLabel = kReciters.firstWhere(
+      (r) => r['id'] == _reciter,
+      orElse: () => {'label': 'Al-Afasy'},
+    )['label'] as String;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF9F9FB),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black,
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Progress
+          if (_progressTotal > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: _progressTotal > 0 ? _progressDone / _progressTotal : 0,
+                    backgroundColor: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB),
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$_progressDone / $_progressTotal',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Reciter label
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Text(
+              reciterLabel,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Controls
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _controlButton(Icons.skip_previous_rounded, 'Sourate précédente', _prevSurah, primaryColor, isDark),
+              _controlButton(Icons.fast_rewind_rounded, 'Verset précédent', _prevVerse, primaryColor, isDark),
+              _playButton(isPlaying, primaryColor),
+              _controlButton(Icons.fast_forward_rounded, 'Verset suivant', _nextVerse, primaryColor, isDark),
+              _controlButton(Icons.skip_next_rounded, 'Sourate suivante', _nextSurah, primaryColor, isDark),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Stop button
+          SizedBox(
+            width: 160,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFEF4444),
+                side: const BorderSide(color: Color(0xFFEF4444)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+              ),
+              onPressed: () {
+                _stop();
+                setState(() => _showFullScreenPlayer = false);
+              },
+              icon: const Icon(Icons.stop_rounded, size: 18),
+              label: const Text('Arrêter', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _controlButton(IconData icon, String tooltip, VoidCallback onPressed, Color primary, bool isDark) {
+    return IconButton(
+      icon: Icon(icon, size: 28, color: isDark ? const Color(0xFFE5E5EA) : const Color(0xFF374151)),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      hoverColor: primary.withOpacity(0.1),
+    );
+  }
+
+  Widget _playButton(bool isPlaying, Color primary) {
+    return FloatingActionButton.large(
+      onPressed: _togglePausePlay,
+      backgroundColor: primary,
+      elevation: 4,
+      child: Icon(
+        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+        size: 44,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  // ---- MAIN BUILD ----
 
   @override
   Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
     if (_showFullScreenPlayer) {
-      return _buildFullScreenPlayer(context);
+      return _buildFullScreenPlayer(context, appState);
     }
 
-    final appState = Provider.of<AppState>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -1412,7 +1517,6 @@ class _RecitationScreenState extends State<RecitationScreen> {
         actions: [
           IconButton(
             icon: Icon(appState.isDarkMode ? Icons.wb_sunny_outlined : Icons.nightlight_round),
-            tooltip: appState.isDarkMode ? 'Passer en mode clair' : 'Passer en mode sombre',
             onPressed: () => appState.toggleTheme(!appState.isDarkMode),
           ),
         ],
@@ -1420,147 +1524,198 @@ class _RecitationScreenState extends State<RecitationScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // iOS Segmented Mode Picker
+          // ---- SELECTION CARD ----
+          _glassCard(isDark, [
+            const Text('Sélection', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, letterSpacing: 0.3)),
+            const SizedBox(height: 14),
+
+            // Surah dropdown + verse input
+            _surahDropdown(_singleSurah, (v) {
+              setState(() {
+                _mode = 'single';
+                _singleSurah = v;
+                _syncControllers();
+              });
+            }, ctrl: _singleSurahCtrl),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const SizedBox(width: 100),
+                const SizedBox(width: 12),
+                const Text('Verset:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 68,
+                  height: 36,
+                  child: TextField(
+                    controller: _verseInputCtrl,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFD1D5DB),
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    ),
+                    textAlign: TextAlign.center,
+                    onTap: () {
+                      _verseInputCtrl.selection = TextSelection(
+                        baseOffset: 0, extentOffset: _verseInputCtrl.text.length,
+                      );
+                    },
+                    onChanged: (v) {
+                      final val = int.tryParse(v) ?? 1;
+                      setState(() {
+                        _singleVerse = val.clamp(1, kAyahCounts[_singleSurah - 1]);
+                        _syncControllers();
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Presets
+            const Text('Lecture rapide', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93))),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _presetButton('Al-Fatiha', 'Al-Faatiha', 1, 1, primaryColor),
+                _presetButton('Dernières 10', 'Al-Nas', 105, 1, primaryColor),
+                _presetButton('Page 1', 'Page 1', 1, 1, primaryColor),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _presetButton('Sourate 114', 'An-Naas', 114, 1, primaryColor),
+                _presetButton('Sourate 36', 'Yaseen', 36, 1, primaryColor),
+                _presetButton('Sourate 55', 'Ar-Rahman', 55, 1, primaryColor),
+              ],
+            ),
+          ]),
+
+          const SizedBox(height: 14),
+
+          // ---- MODE PICKER ----
           Container(
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFE5E7EB),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFD1D5DB), width: 1),
             ),
             child: Row(
-              children: ['single', 'range', 'page', 'loop'].map((m) {
-                final selected = _mode == m;
-                final label = m == 'single' ? 'Verset' : m == 'range' ? 'Plage' : m == 'page' ? 'Page' : 'Boucle';
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _mode = m),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: BoxDecoration(
-                        color: selected ? primaryColor : Colors.transparent,
-                        borderRadius: BorderRadius.circular(9),
-                        boxShadow: selected && !isDark
-                            ? [BoxShadow(color: primaryColor.withOpacity(0.2), blurRadius: 4, offset: const Offset(0, 2))]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          label,
-                          style: TextStyle(
-                            color: selected ? Colors.white : (isDark ? Colors.grey.shade400 : Colors.grey.shade700),
-                            fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
+              children: [
+                _modeChip('single', 'Verset', isDark, primaryColor),
+                _modeChip('range', 'Plage', isDark, primaryColor),
+                _modeChip('page', 'Page', isDark, primaryColor),
+                _modeChip('loop', 'Boucle', isDark, primaryColor),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
 
-          // Mode-specific inputs
+          const SizedBox(height: 14),
+
+          // ---- MODE INPUTS ----
           if (_mode == 'range')
-            _card([
-              _inputRow('Sourate début', _startSurah, 1, 114, (v) => setState(() { _startSurah = v; _syncControllers(); }), ctrl: _startSurahCtrl),
-              _inputRow('Verset début', _startVerse, 1, 286, (v) => setState(() { _startVerse = v; _syncControllers(); }), ctrl: _startVerseCtrl),
-              _inputRow('Sourate fin', _endSurah, 1, 114, (v) => setState(() { _endSurah = v; _syncControllers(); }), ctrl: _endSurahCtrl),
-              _inputRow('Verset fin', _endVerse, 1, 286, (v) => setState(() { _endVerse = v; _syncControllers(); }), ctrl: _endVerseCtrl),
+            _glassCard(isDark, [
+              _styledInput('Sourate début', _startSurah, 1, 114, (v) => setState(() { _startSurah = v; _syncControllers(); }), ctrl: _startSurahCtrl),
+              _styledInput('Verset début', _startVerse, 1, 286, (v) => setState(() { _startVerse = v; _syncControllers(); }), ctrl: _startVerseCtrl),
+              const SizedBox(height: 4),
+              _styledInput('Sourate fin', _endSurah, 1, 114, (v) => setState(() { _endSurah = v; _syncControllers(); }), ctrl: _endSurahCtrl),
+              _styledInput('Verset fin', _endVerse, 1, 286, (v) => setState(() { _endVerse = v; _syncControllers(); }), ctrl: _endVerseCtrl),
             ]),
+
           if (_mode == 'page')
-            _card([
-              _inputRow('Page (1–604)', _pageNumber, 1, 604,
-                  (v) => setState(() { _pageNumber = v; _syncControllers(); }), ctrl: _pageNumberCtrl),
+            _glassCard(isDark, [
+              _styledInput('Page (1–604)', _pageNumber, 1, 604, (v) => setState(() { _pageNumber = v; _syncControllers(); }), ctrl: _pageNumberCtrl),
             ]),
+
           if (_mode == 'single' || _mode == 'loop')
-            _card([
-              _inputRow('Sourate', _singleSurah, 1, 114, (v) => setState(() { _singleSurah = v; _syncControllers(); }), ctrl: _singleSurahCtrl),
-              _inputRow('Verset', _singleVerse, 1, 286, (v) => setState(() { _singleVerse = v; _syncControllers(); }), ctrl: _singleVerseCtrl),
+            _glassCard(isDark, [
+              _styledInput('Sourate', _singleSurah, 1, 114, (v) => setState(() { _singleSurah = v; _syncControllers(); }), ctrl: _singleSurahCtrl),
+              _styledInput('Verset', _singleVerse, 1, 286, (v) => setState(() { _singleVerse = v; _syncControllers(); }), ctrl: _singleVerseCtrl),
             ]),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Settings card
-          _card([
-            const Text('Options de lecture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const Divider(),
-            SwitchListTile(
-              title: const Text('Annoncer Sourate + Verset'),
-              subtitle: const Text('"Sourate Al-Fatiha, verset 1"'),
-              value: _announceSurahVerse,
-              onChanged: (v) {
-                setState(() => _announceSurahVerse = v);
-                _savePref('announceSurahVerse', v);
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Annoncer juste "Verset X"'),
-              subtitle: const Text('Optionnel, en plus de l\'annonce de sourate'),
-              value: _announceVerseOnly,
-              onChanged: (v) => setState(() => _announceVerseOnly = v),
-            ),
-            SwitchListTile(
-              title: const Text('Lire la récitation'),
-              subtitle: const Text('Audio local (cached)'),
-              value: _speakRecitation,
-              onChanged: (v) {
-                setState(() => _speakRecitation = v);
-                _savePref('speakRecitation', v);
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Lire la traduction'),
-              value: _speakTranslation,
-              onChanged: (v) {
-                setState(() => _speakTranslation = v);
-                _savePref('speakTranslation', v);
-              },
-            ),
-            SwitchListTile(
-              title: const Text('Boucle infinie'),
-              subtitle: const Text('Répéter indéfiniment'),
-              value: _infiniteLoop,
-              onChanged: (v) => setState(() => _infiniteLoop = v),
-            ),
-            if (!_infiniteLoop)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Row(
-                  children: [
-                    const Text('Répétitions: '),
-                    Expanded(
-                      child: Slider(
-                        value: _repeatCount.toDouble(),
-                        min: 1,
-                        max: 99,
-                        divisions: 98,
-                        label: _repeatCount.toString(),
-                        onChanged: (v) {
-                          setState(() => _repeatCount = v.round());
-                          _savePref('repeatCount', v.round());
-                        },
-                      ),
-                    ),
-                    Text('x$_repeatCount'),
-                  ],
-                ),
-              ),
-            const Divider(),
+          // ---- OPTIONS CARD ----
+          _glassCard(isDark, [
+            const Text('Options de lecture', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, letterSpacing: 0.3)),
+            const SizedBox(height: 12),
 
-            // ---- VOICE SELECTION ----
-            const Text('🗣 Voix TTS (local)', style: TextStyle(fontWeight: FontWeight.bold)),
+            _switchRow('Annoncer la sourate', 'Ex: "Sourate Al-Fatiha"', _announceSurahVerse, (v) {
+              setState(() => _announceSurahVerse = v);
+              _savePref('announceSurahVerse', v);
+            }, isDark: isDark),
             const SizedBox(height: 4),
-            const Text('Voix système — fonctionne hors-ligne', style: TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 8),
+            _switchRow('Annoncer le verset', 'Ex: "Verset 1"', _announceVerseOnly, (v) {
+              setState(() => _announceVerseOnly = v);
+            }, isDark: isDark),
+            const SizedBox(height: 4),
+            _switchRow('Lire la récitation', 'Audio local (fichier)', _speakRecitation, (v) {
+              setState(() => _speakRecitation = v);
+              _savePref('speakRecitation', v);
+            }, isDark: isDark),
+            const SizedBox(height: 4),
+            _switchRow('Lire la traduction', 'Voix TTS française', _speakTranslation, (v) {
+              setState(() => _speakTranslation = v);
+              _savePref('speakTranslation', v);
+            }, isDark: isDark),
+            const SizedBox(height: 4),
+            _switchRow('Boucle infinie', 'Répéter indéfiniment', _infiniteLoop, (v) {
+              setState(() => _infiniteLoop = v);
+            }, isDark: isDark),
 
-            // Language selector
+            if (!_infiniteLoop) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  const Text('Répétitions:', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Slider(
+                      value: _repeatCount.toDouble(),
+                      min: 1,
+                      max: 99,
+                      divisions: 98,
+                      label: _repeatCount.toString(),
+                      onChanged: (v) {
+                        setState(() => _repeatCount = v.round());
+                        _savePref('repeatCount', v.round());
+                      },
+                      activeColor: primaryColor,
+                      inactiveColor: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFD1D5DB),
+                    ),
+                  ),
+                  Text(
+                    'x${_repeatCount}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+
+            const Divider(height: 24, color: Color(0xFFE5E7EB)),
+            const Text('VOCODER TTS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF8E8E93))),
+            const SizedBox(height: 4),
+            const Text('Voix système — fonctionne hors-ligne', style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+            const SizedBox(height: 10),
+
+            // Language
             Row(
               children: [
-                const Text('Langue:'),
+                const Text('Langue:', style: TextStyle(fontSize: 14)),
                 const SizedBox(width: 8),
                 ChoiceChip(
                   label: const Text('Français'),
@@ -1570,6 +1725,12 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     _savePref('lang', 'fr');
                     _selectDefaultVoice();
                   },
+                  selectedColor: primaryColor,
+                  labelStyle: TextStyle(
+                    color: _lang == 'fr' ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 ChoiceChip(
@@ -1580,322 +1741,436 @@ class _RecitationScreenState extends State<RecitationScreen> {
                     _savePref('lang', 'en');
                     _selectDefaultVoice();
                   },
+                  selectedColor: primaryColor,
+                  labelStyle: TextStyle(
+                    color: _lang == 'en' ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
-
-
-            // ---- RECITER ----
+            // Reciter
             Row(
               children: [
-                const Text('Récitateur:'),
+                const Text('Récitateur:', style: TextStyle(fontSize: 14)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: DropdownButton<String>(
                     value: _reciter,
                     isExpanded: true,
-                    items: kReciters
-                        .map((r) => DropdownMenuItem<String>(
-                              value: r['id'] as String,
-                              child: Text(r['label'] as String, style: const TextStyle(fontSize: 12)),
-                            ))
-                        .toList(),
+                    items: kReciters.map((r) => DropdownMenuItem<String>(
+                      value: r['id'] as String,
+                      child: Text(r['label'] as String, style: const TextStyle(fontSize: 13)),
+                    )).toList(),
                     onChanged: (v) {
                       setState(() => _reciter = v!);
                       _savePref('reciter', v);
                     },
+                    underline: const SizedBox(),
+                    dropdownColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                    style: TextStyle(fontSize: 13, color: isDark ? const Color(0xFFE5E5EA) : const Color(0xFF111827)),
                   ),
                 ),
               ],
             ),
           ]),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // iOS Style Action Buttons
+          // ---- ACTION BUTTONS ----
           Row(
             children: [
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primaryColor,
-                    disabledBackgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
                   onPressed: _isRunning ? null : _play,
-                  icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                  label: const Text('Lancer', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                  label: const Text('Lancer la lecture', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFEF4444),
-                    disabledBackgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.grey.shade300,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
                   onPressed: _isRunning ? _stop : null,
-                  icon: const Icon(Icons.stop_rounded, size: 22),
+                  icon: const Icon(Icons.stop_rounded, size: 24),
                   label: const Text('Arrêter', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
-          // Test buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _isRunning ? null : _testAudio,
-                  child: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Center(child: Text('🔊 TEST Audio', style: TextStyle(fontSize: 13))),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _isRunning ? null : _testTts,
-                  child: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Center(child: Text('🗣 TEST TTS', style: TextStyle(fontSize: 13))),
-                  ),
-                ),
-              ),
-            ],
-          ),
-
+          // Error
           if (_error != null)
             Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text('⚠️ $_error', style: const TextStyle(color: Colors.red)),
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('⚠️ $_error', style: const TextStyle(color: Color(0xFFEF4444), fontSize: 13)),
             ),
 
-          if (_progressTotal > 0)
+          // Progress
+          if (_progressTotal > 0 && !_isRunning)
             Column(
               children: [
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 LinearProgressIndicator(
-                    value: _progressTotal > 0 ? _progressDone / _progressTotal : 0),
-                Text('$_progressDone / $_progressTotal'),
+                  value: _progressDone / _progressTotal,
+                  backgroundColor: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB),
+                  color: primaryColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Terminé: $_progressDone / $_progressTotal',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                  ),
+                ),
               ],
             ),
 
-          // Display (iOS Liquid Glass Now Playing Player Card)
+          // ---- NOW PLAYING CARD (compact) ----
           if (_arabicText.isNotEmpty || _isRunning)
-            Container(
-              margin: const EdgeInsets.only(top: 16),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                  child: Container(
-                    padding: const EdgeInsets.all(22),
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: _phase == 'reciting'
-                            ? const Color(0xFF10B981)
-                            : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: _phase == 'reciting'
-                              ? const Color(0xFF10B981)
-                              : Colors.black,
-                          blurRadius: 25,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                              decoration: BoxDecoration(
-                                color: _phase == 'reciting'
-                                    ? const Color(0xFF10B981)
-                                    : _phase == 'announcing'
-                                        ? Colors.blue
-                                        : Colors.orange,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: _phase == 'reciting'
-                                      ? const Color(0xFF10B981)
-                                      : Colors.transparent,
-                                  width: 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: _phase == 'reciting'
-                                          ? const Color(0xFF10B981)
-                                          : _phase == 'announcing'
-                                              ? Colors.blue
-                                              : Colors.orange,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _phase == 'idle'
-                                        ? 'Prêt'
-                                        : _phase == 'announcing'
-                                            ? '🔊 Annonce'
-                                            : _phase == 'reciting'
-                                                ? '📖 Récitation'
-                                                : '🌍 Traduction',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                      color: _phase == 'reciting'
-                                          ? const Color(0xFF10B981)
-                                          : _phase == 'announcing'
-                                              ? Colors.blue
-                                              : Colors.orange,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              'Répétition $_repeatIndex${_infiniteLoop ? ' (∞)' : ''}',
-                              style: const TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                        if (_currentSurahName != null) ...[
-                          const SizedBox(height: 14),
-                          Text(
-                            '$_currentSurahName — Verset $_currentVerseNum',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF10B981), letterSpacing: 0.3),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
-                        const SizedBox(height: 12),
+            _nowPlayingCard(isDark, primaryColor),
+        ],
+      ),
+    );
+  }
 
-                        // Toggles mode lecture (Arabe, Phonétique, Traduction)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            FilterChip(
-                              label: const Text('Arabe', style: TextStyle(fontSize: 11)),
-                              selected: _showArabic,
-                              onSelected: (v) => setState(() => _showArabic = v),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            const SizedBox(width: 6),
-                            FilterChip(
-                              label: const Text('Phonétique', style: TextStyle(fontSize: 11)),
-                              selected: _showTransliteration,
-                              onSelected: (v) => setState(() => _showTransliteration = v),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            const SizedBox(width: 6),
-                            FilterChip(
-                              label: const Text('Traduction', style: TextStyle(fontSize: 11)),
-                              selected: _showTranslation,
-                              onSelected: (v) => setState(() => _showTranslation = v),
-                              visualDensity: VisualDensity.compact,
-                            ),
-                          ],
-                        ),
+  Widget _glassCard(bool isDark, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB),
+          width: 0.5,
+        ),
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
+  }
 
-                        if (_showArabic && _arabicText.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: _phase == 'reciting'
-                                  ? const Color(0xFF10B981)
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Text(
-                              _arabicText,
-                              style: TextStyle(
-                                fontSize: 28,
-                                height: 1.8,
-                                color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF111827),
-                                fontWeight: FontWeight.w600,
-                              ),
-                              textAlign: TextAlign.center,
-                              textDirection: TextDirection.rtl,
-                            ),
-                          ),
-                        ],
+  Widget _modeChip(String mode, String label, bool isDark, Color primary) {
+    final selected = _mode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _mode = mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: selected ? primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+                fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-                        if (_showTransliteration && _transliterationText.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _transliterationText,
-                              style: TextStyle(
-                                fontSize: 14,
-                                height: 1.4,
-                                color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF4B5563),
-                                fontStyle: FontStyle.italic,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-
-                        if (_showTranslation && _translationText.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _translationText,
-                              style: TextStyle(
-                                fontSize: 15,
-                                height: 1.4,
-                                color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
-                              ),
-                              textAlign: TextAlign.left,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+  Widget _switchRow(String title, String subtitle, bool value, Function(bool) onChanged,
+      {bool isDark = false, Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => onChanged(!value),
+            child: Container(
+              width: 44,
+              height: 26,
+              decoration: BoxDecoration(
+                color: value ? (color ?? const Color(0xFF10B981)) : (isDark ? const Color(0xFF3A3A3C) : const Color(0xFFD1D5DB)),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: AnimatedPadding(
+                duration: const Duration(milliseconds: 150),
+                padding: EdgeInsets.only(right: value ? 18 : 3),
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
                   ),
                 ),
               ),
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? const Color(0xFFE5E5EA) : const Color(0xFF111827),
+                  ),
+                ),
+                if (subtitle.isNotEmpty)
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark ? const Color(0xFF717174) : const Color(0xFF8E8E93),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _nowPlayingCard(bool isDark, Color primaryColor) {
+    final isReciting = _phase == 'reciting';
+    final phaseColor = isReciting
+        ? const Color(0xFF10B981)
+        : (_phase == 'announcing' ? const Color(0xFF2563EB) : const Color(0xFFFF9500));
+    final phaseLabel = _phase == 'idle'
+        ? 'Prêt'
+        : (_phase == 'announcing' ? 'Annonce' : (_phase == 'reciting' ? 'Récitation' : 'Traduction'));
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E).withOpacity(0.85) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isReciting ? const Color(0xFF10B981) : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isReciting ? const Color(0xFF10B981).withOpacity(0.25) : Colors.black.withOpacity(0.1),
+                  blurRadius: 20,
+                  spreadRadius: isReciting ? 1 : 0,
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: phaseColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            phaseLabel,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_isRunning)
+                      Text(
+                        'Rép. $_repeatIndex${_infiniteLoop ? ' ∞' : ''}',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                      ),
+                  ],
+                ),
+
+                if (_currentSurahName != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '$_currentSurahName',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF10B981),
+                      letterSpacing: 0.2,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    'Verset $_currentVerseNum',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 10),
+
+                // Toggle chips
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FilterChip(
+                      label: const Text('Arabe', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                      selected: _showArabic,
+                      onSelected: (v) => setState(() => _showArabic = v),
+                      selectedColor: primaryColor,
+                      labelStyle: TextStyle(
+                        color: _showArabic ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Phonétique', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                      selected: _showTransliteration,
+                      onSelected: (v) => setState(() => _showTransliteration = v),
+                      selectedColor: primaryColor,
+                      labelStyle: TextStyle(
+                        color: _showTransliteration ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                    const SizedBox(width: 6),
+                    FilterChip(
+                      label: const Text('Traduction', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500)),
+                      selected: _showTranslation,
+                      onSelected: (v) => setState(() => _showTranslation = v),
+                      selectedColor: primaryColor,
+                      labelStyle: TextStyle(
+                        color: _showTranslation ? Colors.white : (isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280)),
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                  ],
+                ),
+
+                if (_showArabic && _arabicText.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isReciting ? const Color(0xFF10B981) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _arabicText,
+                      style: TextStyle(
+                        fontSize: 26,
+                        height: 1.8,
+                        color: isDark ? const Color(0xFFF9FAFB) : const Color(0xFF111827),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                    ),
+                  ),
+                ],
+
+                if (_showTransliteration && _transliterationText.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _transliterationText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color: isDark ? const Color(0xFFD1D5DB) : const Color(0xFF6B7280),
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+
+                if (_showTranslation && _translationText.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _translationText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: isDark ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
+                      ),
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1907,6 +2182,7 @@ class _RecitationScreenState extends State<RecitationScreen> {
 
 class DownloadScreen extends StatefulWidget {
   const DownloadScreen({super.key});
+
   @override
   State<DownloadScreen> createState() => _DownloadScreenState();
 }
@@ -1920,6 +2196,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
   int _downloadedVerses = 0;
   Directory? _cacheDir;
   Set<String> _cachedFiles = {};
+  int _totalCached = 0;
 
   @override
   void initState() {
@@ -1940,6 +2217,8 @@ class _DownloadScreenState extends State<DownloadScreen> {
     if (_cacheDir == null || !await _cacheDir!.exists()) return;
     final files = await _cacheDir!.list().toList();
     _cachedFiles = files.whereType<File>().map((f) => f.uri.pathSegments.last).toSet();
+    _totalCached = _cachedFiles.length;
+    if (mounted) setState(() {});
   }
 
   int _countCachedForSurah(int surah) {
@@ -1992,7 +2271,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
         }
 
         setState(() => _downloadedVerses = v);
-        await Future.delayed(const Duration(milliseconds: 300)); // Rate limit
+        await Future.delayed(const Duration(milliseconds: 300));
       }
 
       await _refreshCacheList();
@@ -2015,11 +2294,11 @@ class _DownloadScreenState extends State<DownloadScreen> {
         deleted++;
       }
     }
+    await _refreshCacheList();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Supprimé: $deleted fichiers')),
       );
-      setState(() {});
     }
   }
 
@@ -2034,21 +2313,29 @@ class _DownloadScreenState extends State<DownloadScreen> {
       }
     }
     _cachedFiles.clear();
+    await _refreshCacheList();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Tout supprimé: $deleted fichiers')),
       );
-      setState(() {});
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Téléchargements'),
         actions: [
-          if (!_isDownloading)
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Actualiser',
+            onPressed: _refreshCacheList,
+          ),
+          if (!_isDownloading && _totalCached > 0)
             IconButton(
               icon: const Icon(Icons.delete_sweep),
               tooltip: 'Tout supprimer',
@@ -2060,161 +2347,227 @@ class _DownloadScreenState extends State<DownloadScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Info banner
-          _cardInfo(
-            icon: Icons.info_outline,
-            title: 'Cache local',
-            subtitle: 'Téléchargez les récitations pour une lecture hors-ligne',
-          ),
-
-          const SizedBox(height: 12),
-
-          // Reciter selector
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Récitateur', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  DropdownButton<String>(
-                    value: _reciter,
-                    isExpanded: true,
-                    items: kReciters
-                        .map((r) => DropdownMenuItem(
-                              value: r['id'] as String,
-                              child: Text(r['label'] as String, style: const TextStyle(fontSize: 13)),
-                            ))
-                        .toList(),
-                    onChanged: _isDownloading ? null : (v) {
-                      setState(() => _reciter = v!);
-                      _refreshCacheList();
-                    },
-                  ),
-                ],
-              ),
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B980).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Range selector
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Plage à télécharger', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Row(
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, color: Color(0xFF10B981), size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('De: '),
-                      Expanded(
-                        child: DropdownButton<int>(
-                          value: _startSurah,
-                          isExpanded: true,
-                          items: List.generate(114, (i) => DropdownMenuItem(
-                            value: i + 1,
-                            child: Text('${i + 1}. ${kSurahNames[i]}', style: const TextStyle(fontSize: 12)),
-                          )),
-                          onChanged: _isDownloading ? null : (v) {
-                            if (v != null && v > _endSurah) {
-                              setState(() { _startSurah = v; _endSurah = v; });
-                            } else if (v != null) {
-                              setState(() => _startSurah = v);
-                            }
-                          },
-                        ),
-                      ),
-                      const Text('  À: '),
-                      Expanded(
-                        child: DropdownButton<int>(
-                          value: _endSurah,
-                          isExpanded: true,
-                          items: List.generate(114, (i) => DropdownMenuItem(
-                            value: i + 1,
-                            child: Text('${i + 1}. ${kSurahNames[i]}', style: const TextStyle(fontSize: 12)),
-                          )),
-                          onChanged: _isDownloading ? null : (v) {
-                            if (v != null && v < _startSurah) {
-                              setState(() { _endSurah = v; _startSurah = v; });
-                            } else if (v != null) {
-                              setState(() => _endSurah = v);
-                            }
-                          },
+                      const Text('Cache local', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(
+                        '$_totalCached fichiers en cache — Lecture hors-ligne possible',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
                         ),
                       ),
                     ],
                   ),
-                ],
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 4),
+
+          // Reciter selector
+          _glassCard(isDark, [
+            const Text('Récitateur', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 8),
+            DropdownButton<String>(
+              value: _reciter,
+              isExpanded: true,
+              items: kReciters.map((r) => DropdownMenuItem(
+                value: r['id'] as String,
+                child: Text(r['label'] as String, style: const TextStyle(fontSize: 13)),
+              )).toList(),
+              onChanged: _isDownloading ? null : (v) {
+                setState(() => _reciter = v!);
+                _refreshCacheList();
+              },
+              underline: const SizedBox(),
+              dropdownColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+            ),
+          ]),
+
+          const SizedBox(height: 12),
+
+          // Range selector
+          _glassCard(isDark, [
+            const Text('Plage à télécharger', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('De:', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButton<int>(
+                    value: _startSurah,
+                    isExpanded: true,
+                    items: List.generate(114, (i) => DropdownMenuItem(
+                      value: i + 1,
+                      child: Text('${i + 1}. ${kSurahNames[i]}', style: const TextStyle(fontSize: 12)),
+                    )),
+                    onChanged: _isDownloading ? null : (v) {
+                      if (v != null && v > _endSurah) {
+                        setState(() { _startSurah = v; _endSurah = v; });
+                      } else if (v != null) {
+                        setState(() => _startSurah = v);
+                      }
+                    },
+                    underline: const SizedBox(),
+                    dropdownColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text('À:', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButton<int>(
+                    value: _endSurah,
+                    isExpanded: true,
+                    items: List.generate(114, (i) => DropdownMenuItem(
+                      value: i + 1,
+                      child: Text('${i + 1}. ${kSurahNames[i]}', style: const TextStyle(fontSize: 12)),
+                    )),
+                    onChanged: _isDownloading ? null : (v) {
+                      if (v != null && v < _startSurah) {
+                        setState(() { _endSurah = v; _startSurah = v; });
+                      } else if (v != null) {
+                        setState(() => _endSurah = v);
+                      }
+                    },
+                    underline: const SizedBox(),
+                    dropdownColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ]),
+
+          const SizedBox(height: 14),
+
+          // Download button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _isDownloading ? const Color(0xFF8E8E93) : const Color(0xFF1B5E20),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              onPressed: _isDownloading ? null : () async {
+                for (int s = _startSurah; s <= _endSurah; s++) {
+                  await _downloadSurah(s);
+                }
+              },
+              icon: Icon(_isDownloading ? Icons.hourglass_empty : Icons.download, size: 22),
+              label: Text(
+                _isDownloading
+                    ? 'Téléchargement... $_downloadedVerses/$_totalVerses'
+                    : 'Télécharger $_startSurah à $_endSurah',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
               ),
             ),
           ),
 
-          const SizedBox(height: 12),
-
-          // Download button
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isDownloading ? Colors.grey : const Color(0xFF1B5E20),
-              padding: const EdgeInsets.all(16),
-            ),
-            onPressed: _isDownloading ? null : () async {
-              for (int s = _startSurah; s <= _endSurah; s++) {
-                await _downloadSurah(s);
-              }
-            },
-            icon: Icon(_isDownloading ? Icons.hourglass_empty : Icons.download),
-            label: Text(
-              _isDownloading
-                  ? 'Téléchargement... $_downloadedVerses/$_totalVerses'
-                  : 'Télécharger Sourate $_startSurah à $_endSurah',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ),
-
           if (_isDownloading) ...[
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             LinearProgressIndicator(
               value: _totalVerses > 0 ? _downloadedVerses / _totalVerses : 0,
+              backgroundColor: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB),
+              color: const Color(0xFF1B5E20),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '$_downloadedVerses / $_totalVerses versets',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+              ),
             ),
           ],
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // List of surahs with cache status
-          const Text('État du cache par sourate', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          // Surah list header
+          const Text('État du cache', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, letterSpacing: 0.3)),
           const SizedBox(height: 8),
 
+          // Surah list
           ...List.generate(114, (i) {
             final surahNum = i + 1;
             final total = kAyahCounts[i];
             final cached = _countCachedForSurah(surahNum);
             final isComplete = cached >= total;
 
-            return Card(
-              child: ListTile(
-                leading: Icon(
-                  isComplete ? Icons.cloud_done : cached > 0 ? Icons.cloud_download : Icons.cloud_upload_outlined,
-                  color: isComplete ? Colors.green : cached > 0 ? Colors.orange : Colors.grey,
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB),
+                    width: 0.5,
+                  ),
                 ),
-                title: Text('${i + 1}. ${kSurahNames[i]}', style: const TextStyle(fontSize: 13)),
-                subtitle: Text('$cached/$total versets', style: const TextStyle(fontSize: 12)),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: Row(
                   children: [
+                    Icon(
+                      isComplete ? Icons.cloud_done : cached > 0 ? Icons.cloud_download : Icons.cloud_upload_outlined,
+                      color: isComplete ? const Color(0xFF10B981) : cached > 0 ? const Color(0xFFFF9500) : const Color(0xFF8E8E93),
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${surahNum}. ${kSurahNames[i]}',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                          ),
+                          Text(
+                            '$cached / $total versets',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? const Color(0xFF717174) : const Color(0xFF8E8E93),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     if (!isComplete)
                       IconButton(
-                        icon: const Icon(Icons.download, size: 20),
+                        icon: const Icon(Icons.download, size: 18),
                         tooltip: 'Télécharger',
                         onPressed: _isDownloading ? null : () => _downloadSurah(surahNum),
+                        color: primaryColor,
+                        iconSize: 18,
                       ),
                     if (cached > 0)
                       IconButton(
-                        icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                        icon: const Icon(Icons.delete_outline, size: 18),
                         tooltip: 'Supprimer',
                         onPressed: _isDownloading ? null : () => _deleteSurahCache(surahNum),
+                        color: const Color(0xFFEF4444),
+                        iconSize: 18,
                       ),
                   ],
                 ),
@@ -2226,26 +2579,19 @@ class _DownloadScreenState extends State<DownloadScreen> {
     );
   }
 
-  Widget _cardInfo({required IconData icon, required String title, required String subtitle}) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(icon, color: const Color(0xFF1B5E20)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                ],
-              ),
-            ),
-          ],
+  Widget _glassCard(bool isDark, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB),
+          width: 0.5,
         ),
       ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
     );
   }
 }
