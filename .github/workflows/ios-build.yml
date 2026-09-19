@@ -83,12 +83,3 @@ jobs:
           name: quran-app-android
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
-
-      - name: Send APK to Telegram (Optional)
-        if: ${{ secrets.TELEGRAM_BOT_TOKEN != '' }}
-        run: |
-          zip -j quran-app-release.zip build/app/outputs/flutter-apk/app-release.apk
-          curl -F chat_id="856614939" \
-               -F document=@quran-app-release.zip \
-               -F caption="📱 *Quran App — Nouvel APK Android généré via GitHub Actions*" \
-               https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument
