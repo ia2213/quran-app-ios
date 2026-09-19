@@ -181,16 +181,19 @@ class AppState extends ChangeNotifier {
   String _reciter = 'ar.alafasy';
   String _translationLang = 'fr';
   bool _isDarkMode = true;
+  bool _isPremium = false;
 
   List<Map<String, dynamic>> get surahs => _surahs;
   bool get surahLoading => _surahLoading;
   String get reciter => _reciter;
   String get translationLang => _translationLang;
   bool get isDarkMode => _isDarkMode;
+  bool get isPremium => _isPremium;
 
   Future<void> loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     _isDarkMode = prefs.getBool('isDarkMode') ?? true;
+    _isPremium = prefs.getBool('isPremium') ?? false;
     notifyListeners();
   }
 
@@ -199,6 +202,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isDarkMode', val);
+  }
+
+  void setPremium(bool val) async {
+    _isPremium = val;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isPremium', val);
   }
 
   Future<void> loadSurahs() async {
@@ -338,6 +348,452 @@ class QuranApp extends StatelessWidget {
   }
 }
 
+void showPaywallSheet(BuildContext context, {String? feature}) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => PaywallSheet(feature: feature),
+  );
+}
+
+class PaywallSheet extends StatefulWidget {
+  final String? feature;
+  const PaywallSheet({super.key, this.feature});
+
+  @override
+  State<PaywallSheet> createState() => _PaywallSheetState();
+}
+
+class _PaywallSheetState extends State<PaywallSheet> {
+  int _selectedPlan = 1;
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFD1D5DB),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 36),
+                const SizedBox(width: 8),
+                Text(
+                  'Pass Hafiz Premium',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF111827),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (widget.feature != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  'Requis pour : ${widget.feature}',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.amber.shade800),
+                ),
+              ),
+            const SizedBox(height: 12),
+            _featureRow(Icons.headphones_rounded, '16 Récitateurs HD', 'Mishary Al-Afasy, Al-Husary, Minshawi, Sudais, etc.'),
+            _featureRow(Icons.cloud_download_rounded, 'Téléchargement Hors-Ligne MP3', 'Toutes les sourates pré-téléchargées sur votre téléphone'),
+            _featureRow(Icons.repeat_on_rounded, 'Répétitions & Boucles Illimitées', 'Répétez 5x, 10x, 20x ou en boucle sans limite'),
+            _featureRow(Icons.psychology_rounded, 'Module Mémorisation (Spaced Repetition)', 'Suivi intelligent de votre rétention mémoire & révisions'),
+            _featureRow(Icons.block_rounded, 'Expérience 100% Sans Publicité', 'Apprentissage fluide et concentré sans interruption'),
+            const SizedBox(height: 18),
+            _planCard(
+              title: 'Abonnement Annuel',
+              subtitle: '19,99 € / an (soit 1,66 € / mois)',
+              badge: 'ÉCONOMISEZ 44%',
+              index: 1,
+              isDark: isDark,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 8),
+            _planCard(
+              title: 'Abonnement Mensuel',
+              subtitle: '2,99 € / mois (Sans engagement)',
+              index: 0,
+              isDark: isDark,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 8),
+            _planCard(
+              title: 'Pass À Vie (Lifetime)',
+              subtitle: '39,99 € paiement unique',
+              badge: 'ACCÈS À VIE',
+              index: 2,
+              isDark: isDark,
+              primaryColor: primaryColor,
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 2,
+                ),
+                onPressed: () {
+                  appState.setPremium(true);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🎉 Félicitations ! Votre Pass Premium Hafiz est activé.'),
+                      backgroundColor: Color(0xFF10B981),
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Activer mon Pass Premium (7 jours gratuits)',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    appState.setPremium(true);
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Vos achats ont été restaurés avec succès.')),
+                    );
+                  },
+                  child: const Text('Restaurer mes achats', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
+                Row(
+                  children: [
+                    const Text('Mode Démo :', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Switch(
+                      value: appState.isPremium,
+                      onChanged: (val) {
+                        appState.setPremium(val);
+                        setState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _featureRow(IconData icon, String title, String subtitle) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10B981).withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: const Color(0xFF10B981), size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _planCard({
+    required String title,
+    required String subtitle,
+    String? badge,
+    required int index,
+    required bool isDark,
+    required Color primaryColor,
+  }) {
+    final isSelected = _selectedPlan == index;
+
+    return GestureDetector(
+      onTap: () => setState(() => _selectedPlan = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? primaryColor.withValues(alpha: 0.1)
+              : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6)),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? primaryColor
+                : (isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB)),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: isSelected ? primaryColor : Colors.grey,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      if (badge != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.amber,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            badge,
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.black),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MemorizationSrsScreen extends StatefulWidget {
+  const MemorizationSrsScreen({super.key});
+
+  @override
+  State<MemorizationSrsScreen> createState() => _MemorizationSrsScreenState();
+}
+
+class _MemorizationSrsScreenState extends State<MemorizationSrsScreen> {
+  final int _memorizedAyahs = 142;
+  final int _dueToday = 15;
+  final int _streakDays = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = Provider.of<AppState>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Mémorisation & SRS'),
+        actions: [
+          IconButton(
+            icon: Icon(appState.isDarkMode ? Icons.wb_sunny_outlined : Icons.nightlight_round),
+            onPressed: () => appState.toggleTheme(!appState.isDarkMode),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          if (!appState.isPremium)
+            GestureDetector(
+              onTap: () => showPaywallSheet(context, feature: 'Mémorisation SRS'),
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.workspace_premium_rounded, color: Colors.amber, size: 36),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Débloquer le Module SRS',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          Text(
+                            'Accédez au suivi de rétention mémoire & statistiques',
+                            style: TextStyle(color: Colors.white70, fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      ),
+                      onPressed: () => showPaywallSheet(context, feature: 'Mémorisation SRS'),
+                      child: const Text('Débloquer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Progression Mémorisation', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text('🔥 $_streakDays jours', style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    _statBox('Versets Appris', '$_memorizedAyahs', Icons.menu_book_rounded, primaryColor),
+                    const SizedBox(width: 12),
+                    _statBox('À réviser aujourd\'hui', '$_dueToday', Icons.alarm_rounded, Colors.orange),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Révision Guidée (Algorithme SRS)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 4),
+                const Text(
+                  'L\'algorithme calcule le moment précis de révision pour ancrer chaque verset dans la mémoire à long terme.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () {
+                      if (!appState.isPremium) {
+                        showPaywallSheet(context, feature: 'Session de Révision SRS');
+                        return;
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Session SRS démarrée : 15 versets chargés !')),
+                      );
+                    },
+                    icon: const Icon(Icons.play_circle_fill_rounded),
+                    label: const Text('Démarrer la révision (15 versets)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statBox(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ============================================================
 // HOME
 // ============================================================
@@ -360,6 +816,7 @@ class _QuranHomeState extends State<QuranHome> {
         children: const [
           RecitationScreen(),
           DownloadScreen(),
+          MemorizationSrsScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -378,7 +835,7 @@ class _QuranHomeState extends State<QuranHome> {
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
           backgroundColor: Colors.transparent,
-          indicatorColor: Theme.of(context).colorScheme.primary.withOpacity(0.12),
+          indicatorColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.headphones_outlined),
@@ -389,6 +846,11 @@ class _QuranHomeState extends State<QuranHome> {
               icon: Icon(Icons.download_outlined),
               selectedIcon: Icon(Icons.download),
               label: 'Téléchargements',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.psychology_outlined),
+              selectedIcon: Icon(Icons.psychology),
+              label: 'Mémorisation',
             ),
           ],
         ),
@@ -1527,6 +1989,22 @@ class _RecitationScreenState extends State<RecitationScreen> {
             icon: Icon(appState.isDarkMode ? Icons.wb_sunny_outlined : Icons.nightlight_round),
             onPressed: () => appState.toggleTheme(!appState.isDarkMode),
           ),
+          TextButton.icon(
+            onPressed: () => showPaywallSheet(context),
+            icon: Icon(
+              appState.isPremium ? Icons.workspace_premium : Icons.stars_rounded,
+              color: Colors.amber,
+              size: 20,
+            ),
+            label: Text(
+              appState.isPremium ? 'PREMIUM' : 'OFFRE PRO',
+              style: TextStyle(
+                color: Colors.amber.shade700,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
         ],
       ),
       body: ListView(
@@ -1769,11 +2247,25 @@ class _RecitationScreenState extends State<RecitationScreen> {
                   child: DropdownButton<String>(
                     value: _reciter,
                     isExpanded: true,
-                    items: kReciters.map((r) => DropdownMenuItem<String>(
-                      value: r['id'] as String,
-                      child: Text(r['label'] as String, style: const TextStyle(fontSize: 13)),
-                    )).toList(),
+                    items: kReciters.map((r) {
+                      final isFree = r['id'] == 'ar.alafasy';
+                      return DropdownMenuItem<String>(
+                        value: r['id'] as String,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(r['label'] as String, style: const TextStyle(fontSize: 13)),
+                            if (!isFree && !appState.isPremium)
+                              const Icon(Icons.lock_outline_rounded, size: 14, color: Colors.amber),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                     onChanged: (v) {
+                      if (v != null && v != 'ar.alafasy' && !appState.isPremium) {
+                        showPaywallSheet(context, feature: 'Récitateurs HD Premium');
+                        return;
+                      }
                       setState(() => _reciter = v!);
                       _savePref('reciter', v);
                     },
@@ -2477,6 +2969,11 @@ class _DownloadScreenState extends State<DownloadScreen> {
                 elevation: 0,
               ),
               onPressed: _isDownloading ? null : () async {
+                final appState = Provider.of<AppState>(context, listen: false);
+                if (!appState.isPremium) {
+                  showPaywallSheet(context, feature: 'Téléchargements MP3 Hors-Ligne');
+                  return;
+                }
                 for (int s = _startSurah; s <= _endSurah; s++) {
                   await _downloadSurah(s);
                 }
@@ -2565,7 +3062,14 @@ class _DownloadScreenState extends State<DownloadScreen> {
                       IconButton(
                         icon: const Icon(Icons.download, size: 18),
                         tooltip: 'Télécharger',
-                        onPressed: _isDownloading ? null : () => _downloadSurah(surahNum),
+                        onPressed: _isDownloading ? null : () {
+                          final appState = Provider.of<AppState>(context, listen: false);
+                          if (!appState.isPremium) {
+                            showPaywallSheet(context, feature: 'Téléchargements MP3 Hors-Ligne');
+                            return;
+                          }
+                          _downloadSurah(surahNum);
+                        },
                         color: primaryColor,
                         iconSize: 18,
                       ),
