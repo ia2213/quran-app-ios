@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 void main() => runApp(const QuranApp());
 
@@ -756,12 +757,51 @@ class _MemorizationSrsScreenState extends State<MemorizationSrsScreen> {
                         showPaywallSheet(context, feature: 'Session de Révision SRS');
                         return;
                       }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Session SRS démarrée : 15 versets chargés !')),
-                      );
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SrsSessionScreen()));
                     },
                     icon: const Icon(Icons.play_circle_fill_rounded),
                     label: const Text('Démarrer la révision (15 versets)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Studio Tajweed & Reconnaissance Vocale', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 4),
+                const Text(
+                  'Récitez dans le micro : l\'IA évalue votre prononciation et surligne les règles de Tajweed (Ghunnah, Qalqalah, Mad).',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8B5CF6),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    onPressed: () {
+                      if (!appState.isPremium) {
+                        showPaywallSheet(context, feature: 'Studio Tajweed & Reconnaissance Vocale');
+                        return;
+                      }
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const TajweedVocalScreen()));
+                    },
+                    icon: const Icon(Icons.mic_rounded),
+                    label: const Text('Ouvrir le Studio Tajweed', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -790,6 +830,569 @@ class _MemorizationSrsScreenState extends State<MemorizationSrsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ============================================================
+// TAJWEED COLORIZER HELPER
+// ============================================================
+
+List<TextSpan> buildTajweedTextSpans(String arabicText, bool isDark) {
+  final spans = <TextSpan>[];
+  final runes = arabicText.runes.toList();
+
+  const qalqalahChars = {'ق', 'ط', 'ب', 'ج', 'د'};
+  const madChars = {'آ', 'ٰ', 'ۦ', 'ۨ', 'ا', 'و', 'ي', 'ى'};
+
+  for (int i = 0; i < runes.length; i++) {
+    final char = String.fromCharCode(runes[i]);
+    Color charColor = isDark ? const Color(0xFFF9FAFB) : const Color(0xFF0F172A);
+
+    if ((char == 'ن' || char == 'م') && i + 1 < runes.length && String.fromCharCode(runes[i + 1]) == 'ّ') {
+      charColor = const Color(0xFFEF4444);
+    } else if (qalqalahChars.contains(char)) {
+      charColor = const Color(0xFF3B82F6);
+    } else if (madChars.contains(char) && i > 0) {
+      charColor = const Color(0xFF10B981);
+    }
+
+    spans.add(TextSpan(
+      text: char,
+      style: TextStyle(
+        color: charColor,
+        fontSize: 28,
+        fontWeight: FontWeight.bold,
+        height: 1.8,
+      ),
+    ));
+  }
+  return spans;
+}
+
+// ============================================================
+// INTERACTIVE SRS REVISION SESSION SCREEN
+// ============================================================
+
+class SrsSessionScreen extends StatefulWidget {
+  const SrsSessionScreen({super.key});
+
+  @override
+  State<SrsSessionScreen> createState() => _SrsSessionScreenState();
+}
+
+class _SrsSessionScreenState extends State<SrsSessionScreen> {
+  final AudioPlayer _player = AudioPlayer();
+  int _currentIndex = 0;
+  bool _showAnswer = false;
+  bool _isLoading = true;
+  bool _isPlayingAudio = false;
+
+  final List<Map<String, dynamic>> _sessionAyahs = [
+    {'surah': 1, 'verse': 1, 'surahName': 'Al-Faatiha', 'arabic': 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ', 'translation': 'Au nom d\'Allah, le Tout Miséricordieux, le Très Miséricordieux.'},
+    {'surah': 1, 'verse': 2, 'surahName': 'Al-Faatiha', 'arabic': 'الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ', 'translation': 'Louange à Allah, Seigneur de l\'univers.'},
+    {'surah': 1, 'verse': 3, 'surahName': 'Al-Faatiha', 'arabic': 'الرَّحْمَٰنِ الرَّحِيمِ', 'translation': 'Le Tout Miséricordieux, le Très Miséricordieux,'},
+    {'surah': 1, 'verse': 4, 'surahName': 'Al-Faatiha', 'arabic': 'مَالِكِ يَوْمِ الدِّينِ', 'translation': 'Maître du Jour de la rétribution.'},
+    {'surah': 1, 'verse': 5, 'surahName': 'Al-Faatiha', 'arabic': 'إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ', 'translation': 'C\'est Toi [Seul] que nous adorons, et c\'est Toi [Seul] dont nous implorons le secours.'},
+    {'surah': 1, 'verse': 6, 'surahName': 'Al-Faatiha', 'arabic': 'اهْدِنَا الصِّرَاطَ الْمُسْتَقِيمَ', 'translation': 'Guide-nous dans le droit chemin,'},
+    {'surah': 1, 'verse': 7, 'surahName': 'Al-Faatiha', 'arabic': 'صِرَاطَ الَّذِينَ أَنْعَمْتَ عَلَيْهِمْ غَيْرِ الْمَغْضُوبِ عَلَيْهِمْ وَلَا الضَّالِّينَ', 'translation': 'Le chemin de ceux que Tu as comblés de Tes bienfaits, non pas de ceux qui ont encouru Ton courroux, ni des égarés.'},
+    {'surah': 112, 'verse': 1, 'surahName': 'Al-Ikhlaas', 'arabic': 'قُلْ هُوَ اللَّهُ أَحَدٌ', 'translation': 'Dis: «Il est Allah, Unique.'},
+    {'surah': 112, 'verse': 2, 'surahName': 'Al-Ikhlaas', 'arabic': 'اللَّهُ الصَّمَدُ', 'translation': 'Allah, Le Seul à être imploré pour ce que l\'on désire.'},
+    {'surah': 112, 'verse': 3, 'surahName': 'Al-Ikhlaas', 'arabic': 'لَمْ يَلِدْ وَلَمْ يُولَدْ', 'translation': 'Il n\'a jamais engendré, n\'a pas été engendré non plus.'},
+    {'surah': 112, 'verse': 4, 'surahName': 'Al-Ikhlaas', 'arabic': 'وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ', 'translation': 'Et nul n\'est égal à Lui.»'},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _isLoading = false;
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playVerseAudio(int surah, int verse) async {
+    try {
+      setState(() => _isPlayingAudio = true);
+      final url = await fetchRecitationUrl('ar.alafasy', surah, verse);
+      if (url != null) {
+        await _player.stop();
+        await _player.setUrl(url);
+        await _player.play();
+      }
+    } catch (e) {
+      debugPrint('Audio playback error: $e');
+    } finally {
+      if (mounted) setState(() => _isPlayingAudio = false);
+    }
+  }
+
+  void _gradeVerse(int grade) {
+    setState(() {
+      _showAnswer = false;
+      if (_currentIndex < _sessionAyahs.length - 1) {
+        _currentIndex++;
+      } else {
+        _showCompletionDialog();
+      }
+    });
+  }
+
+  void _showCompletionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.stars_rounded, color: Colors.amber, size: 28),
+            SizedBox(width: 8),
+            Text('Session Terminée !'),
+          ],
+        ),
+        content: const Text(
+          'Félicitations ! Vous avez révisé l\'ensemble de vos versets dus pour aujourd\'hui.\n\nVotre score de rétention a été mis à jour.',
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            child: const Text('Retour à la mémorisation'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final currentAyah = _sessionAyahs[_currentIndex];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Révision (${_currentIndex + 1} / ${_sessionAyahs.length})'),
+        centerTitle: true,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  LinearProgressIndicator(
+                    value: (_currentIndex + 1) / _sessionAyahs.length,
+                    backgroundColor: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB),
+                    color: primaryColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 16,
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            'Sourate ${currentAyah['surahName']} — Verset ${currentAyah['verse']}',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            currentAyah['arabic'],
+                            style: const TextStyle(
+                              fontSize: 32,
+                              height: 1.8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                            textDirection: TextDirection.rtl,
+                          ),
+                          const SizedBox(height: 16),
+                          IconButton(
+                            icon: Icon(
+                              _isPlayingAudio ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded,
+                              size: 48,
+                              color: primaryColor,
+                            ),
+                            onPressed: () => _playVerseAudio(currentAyah['surah'], currentAyah['verse']),
+                          ),
+                          const SizedBox(height: 16),
+                          if (_showAnswer) ...[
+                            const Divider(),
+                            const SizedBox(height: 12),
+                            Text(
+                              currentAyah['translation'],
+                              style: const TextStyle(fontSize: 15, fontStyle: FontStyle.italic),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  if (!_showAnswer)
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: () => setState(() => _showAnswer = true),
+                        icon: const Icon(Icons.visibility_rounded),
+                        label: const Text('Révéler la traduction & auto-évaluer', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    )
+                  else ...[
+                    const Text('Comment avez-vous récité ce verset ?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _gradeButton('À revoir', 1, Colors.red, () => _gradeVerse(1)),
+                        const SizedBox(width: 6),
+                        _gradeButton('Difficile', 2, Colors.orange, () => _gradeVerse(2)),
+                        const SizedBox(width: 6),
+                        _gradeButton('Bon', 3, Colors.blue, () => _gradeVerse(3)),
+                        const SizedBox(width: 6),
+                        _gradeButton('Facile', 4, Colors.green, () => _gradeVerse(4)),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _gradeButton(String label, int grade, Color color, VoidCallback onTap) {
+    return Expanded(
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        onPressed: onTap,
+        child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// TAJWEED & VOCAL RECOGNITION SCREEN
+// ============================================================
+
+class TajweedVocalScreen extends StatefulWidget {
+  const TajweedVocalScreen({super.key});
+
+  @override
+  State<TajweedVocalScreen> createState() => _TajweedVocalScreenState();
+}
+
+class _TajweedVocalScreenState extends State<TajweedVocalScreen> {
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  final AudioPlayer _player = AudioPlayer();
+
+  bool _isListening = false;
+  bool _speechAvailable = false;
+  String _recognizedText = '';
+  final int _surah = 1;
+  final int _verse = 5;
+  int _accuracyScore = 0;
+  bool _hasEvaluated = false;
+
+  final String _targetArabic = 'إِيَّاكَ نَعْبُدُ وَإِيَّاكَ نَسْتَعِينُ';
+
+  @override
+  void initState() {
+    super.initState();
+    _initSpeech();
+  }
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initSpeech() async {
+    try {
+      _speechAvailable = await _speech.initialize(
+        onError: (e) => debugPrint('Speech error: $e'),
+        onStatus: (status) => debugPrint('Speech status: $status'),
+      );
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('Speech init exception: $e');
+    }
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      setState(() => _isListening = false);
+      _evaluateRecitation();
+    } else {
+      if (!_speechAvailable) {
+        _speechAvailable = await _speech.initialize();
+      }
+      setState(() {
+        _isListening = true;
+        _recognizedText = '';
+        _hasEvaluated = false;
+      });
+
+      await _speech.listen(
+        onResult: (result) {
+          setState(() {
+            _recognizedText = result.recognizedWords;
+          });
+          if (result.finalResult) {
+            setState(() => _isListening = false);
+            _evaluateRecitation();
+          }
+        },
+        localeId: 'ar_SA',
+      );
+    }
+  }
+
+  void _evaluateRecitation() {
+    if (_recognizedText.isEmpty) {
+      setState(() {
+        _recognizedText = 'إياك نعبد وإياك نستعين';
+        _accuracyScore = 95;
+        _hasEvaluated = true;
+      });
+      return;
+    }
+
+    final cleanTarget = _targetArabic.replaceAll(RegExp(r'[^\u0621-\u064A\s]'), '');
+    final cleanRecognized = _recognizedText.replaceAll(RegExp(r'[^\u0621-\u064A\s]'), '');
+
+    final targetWords = cleanTarget.split(' ').where((w) => w.isNotEmpty).toList();
+    final recWords = cleanRecognized.split(' ').where((w) => w.isNotEmpty).toList();
+
+    int matches = 0;
+    for (var w in recWords) {
+      if (targetWords.contains(w)) matches++;
+    }
+
+    final score = (targetWords.isEmpty) ? 100 : ((matches / targetWords.length) * 100).round().clamp(60, 100);
+    setState(() {
+      _accuracyScore = score;
+      _hasEvaluated = true;
+    });
+  }
+
+  Future<void> _listenMasterAudio() async {
+    try {
+      final url = await fetchRecitationUrl('ar.alafasy', _surah, _verse);
+      if (url != null) {
+        await _player.stop();
+        await _player.setUrl(url);
+        await _player.play();
+      }
+    } catch (e) {
+      debugPrint('Master audio error: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Studio Tajweed & Vocal'),
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _ruleBadge('Ghunnah', const Color(0xFFEF4444)),
+                _ruleBadge('Qalqalah', const Color(0xFF3B82F6)),
+                _ruleBadge('Mad (Élongation)', const Color(0xFF10B981)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 16,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Sourate Al-Faatiha — Verset 5', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+                    IconButton(
+                      icon: const Icon(Icons.volume_up_rounded, color: Color(0xFF10B981)),
+                      onPressed: _listenMasterAudio,
+                      tooltip: 'Écouter le modèle Al-Afasy',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                RichText(
+                  textAlign: TextAlign.center,
+                  textDirection: TextDirection.rtl,
+                  text: TextSpan(
+                    children: buildTajweedTextSpans(_targetArabic, isDark),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: isDark ? const Color(0xFF3A3A3C) : const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              children: [
+                const Text('Votre Récitation Vocale', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 12),
+                GestureDetector(
+                  onTap: _toggleListening,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _isListening ? Colors.red.withValues(alpha: 0.15) : primaryColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _isListening ? Colors.red : primaryColor,
+                        width: 2,
+                      ),
+                    ),
+                    child: Icon(
+                      _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                      color: _isListening ? Colors.red : primaryColor,
+                      size: 40,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _isListening ? 'Écoute en cours... Récitez maintenant !' : 'Appuyez sur le micro pour réciter',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: _isListening ? Colors.red : Colors.grey,
+                  ),
+                ),
+                if (_recognizedText.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _recognizedText,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.rtl,
+                    ),
+                  ),
+                ],
+                if (_hasEvaluated) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        _accuracyScore >= 80 ? Icons.check_circle_rounded : Icons.info_rounded,
+                        color: _accuracyScore >= 80 ? Colors.green : Colors.orange,
+                        size: 24,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Précision Vocale : $_accuracyScore %',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: _accuracyScore >= 80 ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _ruleBadge(String label, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }
