@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:url_launcher/url_launcher.dart';
 
 void main() async {
@@ -63,16 +61,18 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
   String _pronTip = '';
 
   // Hardware
-  final AudioRecorder _audioRecorder = AudioRecorder();
+  final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
   late AnimationController _animController;
   late Animation<double> _scaleAnimation;
+  String _recognizedText = '';
 
   @override
   void initState() {
     super.initState();
     _loadPreferences();
     _initTts();
+    _initSpeech();
 
     _animController = AnimationController(
       vsync: this,
@@ -84,10 +84,23 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     );
   }
 
+  Future<void> _initSpeech() async {
+    await _speech.initialize(
+      onError: (val) => setState(() => _statusText = 'Prêt'),
+      onStatus: (val) {
+        if (val == 'done' || val == 'notListening') {
+          if (_isListening && _recognizedText.isNotEmpty) {
+            _handleFinalSpeech(_recognizedText);
+          }
+        }
+      },
+    );
+  }
+
   @override
   void dispose() {
     _animController.dispose();
-    _audioRecorder.dispose();
+    _speech.stop();
     _flutterTts.stop();
     super.dispose();
   }
@@ -139,70 +152,62 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
     if (_isProcessing) return;
 
     if (_isListening) {
-      // Stop recording and process
+      // Stop listening
+      _speech.stop();
       setState(() {
         _isListening = false;
         _isProcessing = true;
         _statusText = 'Analyse de votre voix...';
       });
-
-      final path = await _audioRecorder.stop();
-      if (path != null) {
-        await _processVoiceInput(File(path));
+      if (_recognizedText.isNotEmpty) {
+        await _handleFinalSpeech(_recognizedText);
       } else {
         setState(() {
           _isProcessing = false;
-          _statusText = 'Erreur d\'enregistrement';
+          _statusText = 'Aucune parole détectée';
         });
       }
     } else {
-      // Start recording
-      if (await _audioRecorder.hasPermission()) {
-        final dir = await getTemporaryDirectory();
-        final filePath = '${dir.path}/speech_input.m4a';
-
-        await _audioRecorder.start(
-          const RecordConfig(encoder: AudioEncoder.aacLc, sampleRate: 16000),
-          path: filePath,
-        );
-
-        HapticFeedback.mediumImpact();
+      // Start listening
+      bool available = await _speech.initialize();
+      if (available) {
+        _recognizedText = '';
         setState(() {
           _isListening = true;
           _statusText = 'Écoute en cours... (Parlez)';
         });
+        HapticFeedback.mediumImpact();
+        await _speech.listen(
+          localeId: _selectedLang == 'de' ? 'de_DE' : (_selectedLang == 'fr' ? 'fr_FR' : 'en_US'),
+          onResult: (result) {
+            setState(() {
+              _recognizedText = result.recognizedWords;
+              _spokenText = result.recognizedWords;
+            });
+          },
+        );
+      } else {
+        setState(() => _statusText = 'Micro non disponible');
       }
     }
   }
 
-  Future<void> _processVoiceInput(File audioFile) async {
-    try {
-      // 1. Transcription (STT)
-      final sttUri = Uri.parse('$_hermesUrl/v1/audio/transcriptions');
-      final req = http.MultipartRequest('POST', sttUri);
-      req.files.add(await http.MultipartFile.fromPath('file', audioFile.path));
-      req.fields['model'] = 'whisper-1';
-      req.fields['language'] = _selectedLang;
-
-      final streamedResp = await req.send();
-      final respBytes = await streamedResp.stream.toBytes();
-      final respJson = jsonDecode(utf8.decode(respBytes));
-      final userText = respJson['text'] ?? '';
-
-      if (userText.trim().isEmpty) {
-        setState(() {
-          _isProcessing = false;
-          _statusText = 'Aucun son détecté · Réessayez';
-        });
-        return;
-      }
-
+  Future<void> _handleFinalSpeech(String userText) async {
+    if (userText.trim().isEmpty) {
       setState(() {
-        _spokenText = userText;
-        _statusText = 'Génération de la réponse...';
+        _isProcessing = false;
+        _statusText = 'Aucun son détecté';
       });
+      return;
+    }
 
-      // 2. LLM Call (/v1/chat/completions)
+    setState(() {
+      _spokenText = userText;
+      _statusText = 'Génération de la réponse...';
+    });
+
+    try {
+      // LLM Call (/v1/chat/completions)
       final chatUri = Uri.parse('$_hermesUrl/v1/chat/completions');
       final chatBody = {
         'model': _selectedModel,
@@ -239,10 +244,10 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
         _isProcessing = false;
         _spokenText = aiGermanSpeech;
         _translationText = translation;
-        _pronScore = 88; // Score adaptatif
+        _pronScore = 90;
       });
 
-      // 3. TTS Speech
+      // TTS Speech
       await _flutterTts.speak(aiGermanSpeech);
     } catch (e) {
       setState(() {
