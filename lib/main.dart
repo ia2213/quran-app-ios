@@ -4595,6 +4595,31 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
                             ),
                           ),
                         )),
+                  const SizedBox(height: 12),
+                  // 世界城市快速选择网格
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('🌍 快速选择城市:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey)),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      'Mecca', 'Medina', 'Istanbul', 'Cairo', 'Dhaka',
+                      'Jakarta', 'Dubai', 'Riyadh', 'Kuala Lumpur', 'Karachi',
+                      'Paris', 'London', 'Berlin', 'Moscow', 'Istanbul',
+                      'New York', 'Los Angeles', 'Toronto', 'São Paulo', 'Buenos Aires',
+                      'Lagos', 'Nairobi', 'Johannesburg', 'Cape Town', 'Dakar',
+                      'Casablanca', 'Algiers', 'Tunis', 'Baghdad', 'Tehran',
+                    ].map((city) {
+                      return ActionChip(
+                        label: Text(city, style: const TextStyle(fontSize: 12)),
+                        onPressed: () => _fetchPrayerTimes(city),
+                        avatar: const Icon(Icons.location_on, size: 14),
+                      );
+                    }).toList(),
+                  ),
                 ],
               ),
             ),
