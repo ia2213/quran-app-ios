@@ -2,7 +2,7 @@ name: Build iOS IPA (SideStore / AltStore)
 
 on:
   push:
-    branches: [ master, main ]
+    branches: [ master, main, mural-voice ]
   workflow_dispatch:
 
 jobs:
