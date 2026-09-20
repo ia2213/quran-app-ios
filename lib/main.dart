@@ -4199,12 +4199,11 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
   };
 
   final List<String> _popularCities = [
-    'Paris', 'Marseille', 'Lyon', 'Toulouse', 'Nice', 'Nantes', 'Strasbourg',
-    'Montpellier', 'Bordeaux', 'Lille', 'Rennes', 'Reims', 'Le Havre',
-    'Casablanca', 'Rabat', 'Fès', 'Marrakech',
-    'Alger', 'Oran', 'Constantine',
-    'Tunis', 'Sousse', 'Sfax',
-    'Bruxelles', 'Genève', 'Montréal', 'Londres', 'Istanbul'
+    'Mecca', 'Medina', 'Riyadh', 'Dubai', 'Abu Dhabi', 'Doha', 'Kuwait City', 'Muscat', 'Amman', 'Jerusalem', 'Cairo', 'Beirut', 'Istanbul',
+    'Casablanca', 'Rabat', 'Marrakech', 'Alger', 'Oran', 'Tunis', 'Sousse', 'Tripoli', 'Khartoum', 'Dakar', 'Abidjan', 'Bamako', 'Niamey', 'NDjamena',
+    'Paris', 'Lyon', 'Marseille', 'Toulouse', 'Lille', 'Nice', 'Bruxelles', 'Genève', 'Londres', 'Berlin', 'Madrid', 'Rome', 'Amsterdam', 'Vienne', 'Moscou',
+    'Jakarta', 'Kuala Lumpur', 'Islamabad', 'Karachi', 'Dhaka', 'Tashkent', 'Tehran', 'Tokyo', 'Beijing', 'Sydney',
+    'New York', 'Montréal', 'Toronto', 'Chicago', 'Los Angeles', 'São Paulo', 'Buenos Aires'
   ];
 
   final Map<int, List<Map<String, dynamic>>> _adhkarData = {
@@ -4409,7 +4408,7 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
               TextField(
                 controller: searchCtrl,
                 decoration: InputDecoration(
-                  hintText: 'Tapez votre ville (ex: Paris, Lyon, Casablanca...)',
+                  hintText: 'Tapez n\'importe quelle ville du monde (ex: Mecca, Tokyo, Dakar, New York, Casablanca...)',
                   prefixIcon: const Icon(Icons.search),
                   suffixIcon: IconButton(
                     icon: const Icon(Icons.check),
