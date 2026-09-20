@@ -4345,13 +4345,22 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
       double? lat;
       double? lng;
 
-      final geoUrl = Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(city)}&limit=1');
-      final geoRes = await http.get(geoUrl, headers: {'User-Agent': 'QuranApp/1.0'}).timeout(const Duration(seconds: 4));
-      if (geoRes.statusCode == 200) {
-        final geoList = json.decode(geoRes.body) as List;
-        if (geoList.isNotEmpty) {
-          lat = double.tryParse(geoList[0]['lat'].toString());
-          lng = double.tryParse(geoList[0]['lon'].toString());
+      final cityLower = city.trim().toLowerCase();
+      if (cityLower == 'mecca' || cityLower == 'makkah' || cityLower == 'la mecque') {
+        lat = 21.4208;
+        lng = 39.8269;
+      } else if (cityLower == 'medina' || cityLower == 'madinah' || cityLower == 'médine') {
+        lat = 24.4672;
+        lng = 39.6112;
+      } else {
+        final geoUrl = Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(city)}&limit=1');
+        final geoRes = await http.get(geoUrl, headers: {'User-Agent': 'QuranApp/1.0'}).timeout(const Duration(seconds: 4));
+        if (geoRes.statusCode == 200) {
+          final geoList = json.decode(geoRes.body) as List;
+          if (geoList.isNotEmpty) {
+            lat = double.tryParse(geoList[0]['lat'].toString());
+            lng = double.tryParse(geoList[0]['lon'].toString());
+          }
         }
       }
 
