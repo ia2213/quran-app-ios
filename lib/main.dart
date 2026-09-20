@@ -4146,7 +4146,7 @@ class _SearchQuranScreenState extends State<SearchQuranScreen> {
 }
 
 // ============================================================
-// PRAYER TIMES & ADHKAR SCREEN
+// PRAYER TIMES & ADHKAR SCREEN (WITH CITY SELECTOR & FULL ADHKAR)
 // ============================================================
 
 class PrayerAdhkarScreen extends StatefulWidget {
@@ -4158,31 +4158,255 @@ class PrayerAdhkarScreen extends StatefulWidget {
 
 class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
   int _section = 0; // 0 = Prières, 1 = Adhkar
+  int _adhkarCategory = 0; // 0 = Matin, 1 = Soir, 2 = Sommeil, 3 = Prière
+
+  String _selectedCity = 'Paris';
+  String _selectedCountry = 'France';
+  bool _isLoadingPrayer = false;
 
   final Map<String, String> _prayerTimes = {
     'Fajr': '05:46',
-    'Lever du soleil': '07:34',
+    'Sunrise (Chourouk)': '07:34',
     'Dhuhr': '13:44',
     'Asr': '17:09',
     'Maghrib': '19:53',
     'Isha': '21:34',
   };
 
-  final List<Map<String, String>> _adhkarMatin = [
-    {
-      'ar': 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ',
-      'fr': 'Nous sommes au matin et la royauté appartient à Allah, louange à Allah.'
-    },
-    {
-      'ar': 'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا',
-      'fr': 'O Allah ! C\'est par Toi que nous sommes au matin, par Toi que nous sommes au soir, par Toi que nous vivons.'
-    }
+  final List<String> _popularCities = [
+    'Paris', 'Marseille', 'Lyon', 'Toulouse', 'Nice', 'Nantes', 'Strasbourg',
+    'Montpellier', 'Bordeaux', 'Lille', 'Rennes', 'Reims', 'Le Havre',
+    'Casablanca', 'Rabat', 'Fès', 'Marrakech',
+    'Alger', 'Oran', 'Constantine',
+    'Tunis', 'Sousse', 'Sfax',
+    'Bruxelles', 'Genève', 'Montréal', 'Londres', 'Istanbul'
   ];
+
+  final Map<int, List<Map<String, dynamic>>> _adhkarData = {
+    0: [ // MATIN
+      {
+        'ar': 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ',
+        'phonetic': 'Asbahnâ wa asbahal-mulku lillâh, wal-hamdu lillâh, lâ ilâha illallâhu wahdahu lâ sharîka lah...',
+        'fr': 'Nous sommes au matin et la royauté appartient à Allah, louange à Allah. Il n\'y a de divinité digne d\'adoration qu\'Allah Seul sans associé.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ',
+        'phonetic': 'Allâhumma bika asbahnâ, wa bika amsaynâ, wa bika nahyâ, wa bika namûtu wa ilaykan-nushûr.',
+        'fr': 'O Allah ! C\'est par Toi que nous sommes au matin, par Toi que nous sommes au soir, par Toi que nous vivons, par Toi que nous mourons et vers Toi est la résurrection.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'اللَّهُمَّ أَنْتَ رَبِّي لاَ إِلَهَ إِلاَّ أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي فَاغْفِرْ لِي فَإِنَّهُ لاَ يَغْفِرُ الذُّنُوبَ إِلاَّ أَنْتَ',
+        'phonetic': 'Allâhumma anta Rabbî lâ ilâha illâ ant, khalaqtanî wa anâ \'abduk...',
+        'fr': '[Sayyid al-Istighfar] O Allah ! Tu es mon Seigneur, il n\'y a de divinité que Toi. Tu m\'as créé et je suis Ton serviteur. Pardonne-moi, car nul autre que Toi ne pardonne les péchés.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'سُبْحَانَ اللَّهِ وَبِحَمْدِهِ: عَدَدَ خَلْقِهِ، وَرِضَا نَفْسِهِ، وَزِنَةَ عَرْشِهِ، وَمِدَادَ كَلِمَاتِهِ',
+        'phonetic': 'Subhânallâhi wa bihamdih: \'adada khalqih, wa ridâ nafsih, wa zinata \'arshih...',
+        'fr': 'Gloire et louange à Allah, autant de fois que le nombre de Ses créatures, selon Son bon plaisir, au poids de Son Trône et au volume de Ses paroles.',
+        'target': 3,
+        'count': 0,
+      },
+      {
+        'ar': 'بِسْمِ اللَّهِ الَّذِي لاَ يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الأَرْضِ وَلاَ فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ',
+        'phonetic': 'Bismillâhil-ladhî lâ yadurru ma\'as-mihi shay\'un fil-ardi wa lâ fis-samâ\'i wa huwas-Samî\'ul-\'Alîm.',
+        'fr': 'Au nom d\'Allah dont le nom protège contre tout mal sur Terre et dans le Ciel, et Il est l\'Audient, l\'Omniscient.',
+        'target': 3,
+        'count': 0,
+      },
+      {
+        'ar': 'رَضِيتُ بِاللَّهِ رَبًّا، وَبِالإِسْلاَمِ دِينًا، وَبِمُحَمَّدٍ صَلَّى اللَّهُ عَلَيْهِ وَسَلَّمَ نَبِيًّا',
+        'phonetic': 'Radîtu billâhi Rabbâ, wa bil-Islâmi dînâ, wa bi-Muhammadin (saws) Nabiyyâ.',
+        'fr': 'J\'agrée Allah comme Seigneur, l\'Islam comme religion et Muhammad (saws) comme Prophète.',
+        'target': 3,
+        'count': 0,
+      },
+      {
+        'ar': 'يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ، أَصْلِحْ لِي شَأْنِي كُلَّهُ وَلاَ تَكِلْنِي إِلَى نَفْسِي طَرْفَةَ عَيْنٍ',
+        'phonetic': 'Yâ Hayyu yâ Qayyûmu bi-rahmatika astaghîth, aslih lî sha\'nî kullahu...',
+        'fr': 'O Vivant, ô Subsistant par Lui-même, par Ta miséricorde j\'appelle au secours ! Améliore toute ma situation et ne me livre pas à moi-même le temps d\'un clin d\'œil.',
+        'target': 1,
+        'count': 0,
+      },
+    ],
+    1: [ // SOIR
+      {
+        'ar': 'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لاَ إِلَهَ إِلاَّ اللَّهُ وَحْدَهُ لاَ شَرِيكَ لَهُ',
+        'phonetic': 'Amsaynâ wa amsal-mulku lillâh, wal-hamdu lillâh...',
+        'fr': 'Nous sommes au soir et la royauté appartient à Allah, louange à Allah, il n\'y a de divinité digne d\'adoration qu\'Allah Seul.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ وَإِلَيْكَ الْمَصِيرُ',
+        'phonetic': 'Allâhumma bika amsaynâ, wa bika asbahnâ, wa bika nahyâ, wa bika namûtu wa ilaykal-masîr.',
+        'fr': 'O Allah ! C\'est par Toi que nous sommes au soir, par Toi que nous sommes au matin, par Toi que nous vivons et vers Toi est le retour.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ',
+        'phonetic': 'A\'ûdhu bi-kalimâtillâhit-tâmmâti min sharri mâ khalaq.',
+        'fr': 'Je cherche protection auprès des paroles parfaites d\'Allah contre le mal qu\'Il a créé.',
+        'target': 3,
+        'count': 0,
+      },
+      {
+        'ar': 'اللَّهُمَّ عافِنِي فِي بَدَنِي، اللَّهُمَّ عافِنِي فِي سَمْعِي، اللَّهُمَّ عافِنِي فِي بَصَرِي',
+        'phonetic': 'Allâhumma \'âfinî fî badanî, Allâhumma \'âfinî fî sam\'î, Allâhumma \'âfinî fî basarî...',
+        'fr': 'O Allah ! Accorde la santé à mon corps, accorde la santé à mon ouïe, accorde la santé à ma vue.',
+        'target': 3,
+        'count': 0,
+      },
+    ],
+    2: [ // SOMMEIL
+      {
+        'ar': 'بِاسْمِكَ رَبِّي وَضَعْتُ جَنْبِي وَبِكَ أَرْفَعُهُ، فَإِنْ أَمْسَكْتَ نَفْسِي فَارْحَمْهَا، وَإِنْ أَرْسَلْتَهَا فَاحْفَظْهَا',
+        'phonetic': 'Bismika Rabbî wada\'tu janbî wa bika arfa\'uh...',
+        'fr': 'En Ton nom, mon Seigneur, je me suis couché sur le côté et en Ton nom je me relève. Si Tu retiens mon âme, fais-lui miséricorde.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا',
+        'phonetic': 'Bismika Allâhumma amûtu wa ahyâ.',
+        'fr': 'En Ton nom, ô Allah, je meurs et je vis.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'سُبْحَانَ اللَّهِ (33x) ، الْحَمْدُ لِلَّهِ (33x) ، اللَّهُ أَكْبَرُ (34x)',
+        'phonetic': 'Subhânallâh (33x), Al-Hamdulillâh (33x), Allâhu Akbar (34x).',
+        'fr': 'Gloire à Allah (33 fois), Louange à Allah (33 fois), Allah est Le Plus Grand (34 fois).',
+        'target': 100,
+        'count': 0,
+      },
+    ],
+    3: [ // PRIERE
+      {
+        'ar': 'أَسْتَغْفِرُ اللَّهَ (3x) ، اللَّهُمَّ أَنْتَ السَّلاَمُ وَمِنْكَ السَّلاَمُ، تَبَارَكْتَ يَا ذَا الْجَلاَلِ وَالإِكْرَامِ',
+        'phonetic': 'Astaghfirullâh (3x). Allâhumma antas-Salâmu wa minkas-salâm...',
+        'fr': 'Je demande pardon à Allah (3x). O Allah ! Tu es la Paix et de Toi vient la paix. Béni sois-Tu, ô Possesseur de la Majesté et de la Noblesse.',
+        'target': 1,
+        'count': 0,
+      },
+      {
+        'ar': 'آيَةُ الْكُرْسِيِّ (اللَّهُ لاَ إِلَهَ إِلاَّ هُوَ الْحَيُّ الْقَيُّومُ...)',
+        'phonetic': 'Ayat Al-Kursi (Allâhu lâ ilâha illâ huwal-Hayyul-Qayyûm...)',
+        'fr': 'Verset du Trône : Celui qui le récite après chaque prière obligatoire, rien ne l\'empêche d\'entrer au Paradis si ce n\'est la mort.',
+        'target': 1,
+        'count': 0,
+      },
+    ]
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPrayerTimes(_selectedCity);
+  }
+
+  Future<void> _fetchPrayerTimes(String city) async {
+    setState(() {
+      _isLoadingPrayer = true;
+      _selectedCity = city;
+    });
+
+    try {
+      final url = Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=$city&country=$_selectedCountry');
+      final res = await http.get(url).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final timings = data['data']['timings'];
+        setState(() {
+          _prayerTimes['Fajr'] = timings['Fajr'] ?? _prayerTimes['Fajr']!;
+          _prayerTimes['Sunrise (Chourouk)'] = timings['Sunrise'] ?? _prayerTimes['Sunrise (Chourouk)']!;
+          _prayerTimes['Dhuhr'] = timings['Dhuhr'] ?? _prayerTimes['Dhuhr']!;
+          _prayerTimes['Asr'] = timings['Asr'] ?? _prayerTimes['Asr']!;
+          _prayerTimes['Maghrib'] = timings['Maghrib'] ?? _prayerTimes['Maghrib']!;
+          _prayerTimes['Isha'] = timings['Isha'] ?? _prayerTimes['Isha']!;
+        });
+      }
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() => _isLoadingPrayer = false);
+    }
+  }
+
+  void _showCityPickerDialog() {
+    final searchCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sélectionner une Ville'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: searchCtrl,
+                decoration: InputDecoration(
+                  hintText: 'Tapez votre ville (ex: Paris, Lyon, Casablanca...)',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.check),
+                    onPressed: () {
+                      if (searchCtrl.text.trim().isNotEmpty) {
+                        Navigator.pop(ctx);
+                        _fetchPrayerTimes(searchCtrl.text.trim());
+                      }
+                    },
+                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onSubmitted: (val) {
+                  if (val.trim().isNotEmpty) {
+                    Navigator.pop(ctx);
+                    _fetchPrayerTimes(val.trim());
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Villes populaires :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey)),
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _popularCities.map((c) => ActionChip(
+                      label: Text(c),
+                      backgroundColor: c == _selectedCity ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2) : null,
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _fetchPrayerTimes(c);
+                      },
+                    )).toList(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final currentAdhkarList = _adhkarData[_adhkarCategory] ?? [];
 
     return Scaffold(
       appBar: AppBar(
@@ -4200,9 +4424,10 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
                     backgroundColor: _section == 0 ? primaryColor : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
                     foregroundColor: _section == 0 ? Colors.white : Colors.grey,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () => setState(() => _section = 0),
-                  child: const Text('🕌 Prières', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('🕌 Prières & Ville', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(width: 8),
@@ -4212,14 +4437,16 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
                     backgroundColor: _section == 1 ? primaryColor : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
                     foregroundColor: _section == 1 ? Colors.white : Colors.grey,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: () => setState(() => _section = 1),
-                  child: const Text('🤲 Adhkar', style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text('🤲 Citadelle Adhkar', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
+
           if (_section == 0) ...[
             Container(
               padding: const EdgeInsets.all(18),
@@ -4231,45 +4458,154 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Horaires de Prière — Paris', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                      Icon(Icons.location_on, color: Colors.red, size: 18),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, color: Colors.red, size: 22),
+                          const SizedBox(width: 6),
+                          Text('Ville : $_selectedCity', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: primaryColor.withValues(alpha: 0.15),
+                          foregroundColor: primaryColor,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: _showCityPickerDialog,
+                        icon: const Icon(Icons.edit_location_alt, size: 16),
+                        label: const Text('Changer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  ..._prayerTimes.entries.map((e) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(e.key, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                            Text(e.value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: primaryColor)),
-                          ],
-                        ),
-                      )),
+                  if (_isLoadingPrayer)
+                    const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
+                  else
+                    ..._prayerTimes.entries.map((e) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF3F4F6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(e.key, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                                Text(e.value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: primaryColor)),
+                              ],
+                            ),
+                          ),
+                        )),
                 ],
               ),
             ),
           ] else ...[
-            ..._adhkarMatin.map((item) => Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+            // Sub-category selector for Adhkar
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('🌅 Matin (7)'),
+                    selected: _adhkarCategory == 0,
+                    onSelected: (val) => setState(() => _adhkarCategory = 0),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item['ar']!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textDirection: TextDirection.rtl),
-                      const SizedBox(height: 8),
-                      Text(item['fr']!, style: const TextStyle(fontSize: 13, color: Colors.grey)),
-                    ],
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: const Text('🌃 Soir (4)'),
+                    selected: _adhkarCategory == 1,
+                    onSelected: (val) => setState(() => _adhkarCategory = 1),
                   ),
-                )),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: const Text('🌙 Sommeil (4)'),
+                    selected: _adhkarCategory == 2,
+                    onSelected: (val) => setState(() => _adhkarCategory = 2),
+                  ),
+                  const SizedBox(width: 6),
+                  ChoiceChip(
+                    label: const Text('🕌 Prière (2)'),
+                    selected: _adhkarCategory == 3,
+                    onSelected: (val) => setState(() => _adhkarCategory = 3),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...currentAdhkarList.map((item) {
+              final count = item['count'] as int;
+              final target = item['target'] as int;
+              final isDone = count >= target;
+
+              return Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: isDone ? Colors.green.withValues(alpha: 0.5) : (isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+                    width: isDone ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item['ar'],
+                      style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, height: 1.6),
+                      textDirection: TextDirection.rtl,
+                    ),
+                    const SizedBox(height: 10),
+                    if (item['phonetic'] != null)
+                      Text(
+                        item['phonetic'],
+                        style: TextStyle(fontSize: 13, fontStyle: FontStyle.italic, color: primaryColor),
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      item['fr'],
+                      style: const TextStyle(fontSize: 13.5, color: Colors.grey, height: 1.4),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Répétition recommandée : ${item['target']}x',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey),
+                        ),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: isDone ? Colors.green : primaryColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              if (count < target) {
+                                item['count'] = count + 1;
+                              } else {
+                                item['count'] = 0; // reset
+                              }
+                            });
+                          },
+                          icon: Icon(isDone ? Icons.check_circle : Icons.touch_app, size: 16),
+                          label: Text('$count / $target', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ],
       ),
