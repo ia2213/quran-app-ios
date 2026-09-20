@@ -585,8 +585,8 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Mural Voice AI',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                    'Mural Voice AI (v2.0)',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                   const SizedBox(height: 8),
                   Container(
