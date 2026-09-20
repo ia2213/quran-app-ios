@@ -2803,6 +2803,25 @@ class _RecitationScreenState extends State<RecitationScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
+              IconButton(
+                icon: Icon(
+                  _infiniteLoop ? Icons.repeat_one_on : Icons.repeat,
+                  color: _infiniteLoop ? Colors.green : (isDark ? const Color(0xFFE5E5EA) : const Color(0xFF374151)),
+                  size: 26,
+                ),
+                tooltip: _infiniteLoop ? 'Mode Boucle : ACTIVÉ' : 'Mode Boucle : DÉSACTIVÉ',
+                onPressed: () {
+                  setState(() {
+                    _infiniteLoop = !_infiniteLoop;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(_infiniteLoop ? '🔂 Mode Répétition en boucle ACTIVÉ' : '➡️ Mode Répétition en boucle DÉSACTIVÉ'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+              ),
               _controlButton(Icons.skip_previous_rounded, 'Sourate précédente', _prevSurah, primaryColor, isDark),
               _controlButton(Icons.fast_rewind_rounded, 'Verset précédent', _prevVerse, primaryColor, isDark),
               _playButton(isPlaying, primaryColor),
