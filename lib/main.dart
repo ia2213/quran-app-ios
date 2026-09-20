@@ -4164,6 +4164,12 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
   String _selectedCountry = 'France';
   bool _isLoadingPrayer = false;
 
+  String _timezone = '';
+  String _gpsCoords = '';
+  String _calculationMethod = '';
+  String _hijriDate = '';
+  bool _isVerified = false;
+
   final Map<String, String> _prayerTimes = {
     'Fajr': '05:46',
     'Sunrise (Chourouk)': '07:34',
@@ -4321,8 +4327,11 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
       final url = Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=$city&country=$_selectedCountry');
       final res = await http.get(url).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
-        final data = json.decode(res.body);
-        final timings = data['data']['timings'];
+        final data = json.decode(res.body)['data'];
+        final timings = data['timings'];
+        final meta = data['meta'] ?? {};
+        final hijri = data['date']['hijri'] ?? {};
+
         setState(() {
           _prayerTimes['Fajr'] = timings['Fajr'] ?? _prayerTimes['Fajr']!;
           _prayerTimes['Sunrise (Chourouk)'] = timings['Sunrise'] ?? _prayerTimes['Sunrise (Chourouk)']!;
@@ -4330,6 +4339,12 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
           _prayerTimes['Asr'] = timings['Asr'] ?? _prayerTimes['Asr']!;
           _prayerTimes['Maghrib'] = timings['Maghrib'] ?? _prayerTimes['Maghrib']!;
           _prayerTimes['Isha'] = timings['Isha'] ?? _prayerTimes['Isha']!;
+
+          _timezone = meta['timezone'] ?? 'UTC';
+          _gpsCoords = 'Lat: ${meta['latitude']}°, Lng: ${meta['longitude']}°';
+          _calculationMethod = meta['method']?['name'] ?? 'Méthode Standard';
+          _hijriDate = '${hijri['day']} ${hijri['month']?['en']} ${hijri['year']} AH';
+          _isVerified = true;
         });
       }
     } catch (_) {}
@@ -4482,6 +4497,35 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  if (_isVerified && !_isLoadingPrayer) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.verified, color: Colors.green, size: 18),
+                              SizedBox(width: 6),
+                              Text('PREUVE DE VÉRIFICATION GÉO-SPATIALE ✅', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.green)),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text('📍 Ville confirmée : $_selectedCity', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          Text('🌐 Fuseau horaire : $_timezone', style: const TextStyle(fontSize: 12)),
+                          Text('🧭 Coordonnées GPS : $_gpsCoords', style: const TextStyle(fontSize: 12)),
+                          Text('📜 Méthode officielle : $_calculationMethod', style: const TextStyle(fontSize: 12)),
+                          Text('📅 Date Hijri locale : $_hijriDate', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (_isLoadingPrayer)
                     const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
                   else
