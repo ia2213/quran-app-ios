@@ -8,6 +8,8 @@ on:
 jobs:
   build-ios:
     runs-on: macos-15
+    permissions:
+      contents: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -51,3 +53,14 @@ jobs:
           name: Mural-Voice-AI-SideStore
           path: Mural-Voice-AI.ipa
           retention-days: 7
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/mural-voice'
+        with:
+          tag_name: v1.0.0-mural-release
+          name: "Mural Voice AI v1.0.0 (SideStore / AltStore)"
+          body: "Application iOS native Mural Voice AI avec réglages indépendants à 3 zones (Hermes VPS, Gemini, Groq)."
+          files: Mural-Voice-AI.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
