@@ -4324,13 +4324,35 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
     });
 
     try {
-      final url = Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=$city&country=$_selectedCountry');
-      final res = await http.get(url).timeout(const Duration(seconds: 5));
+      double? lat;
+      double? lng;
+
+      final geoUrl = Uri.parse('https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(city)}&limit=1');
+      final geoRes = await http.get(geoUrl, headers: {'User-Agent': 'QuranApp/1.0'}).timeout(const Duration(seconds: 4));
+      if (geoRes.statusCode == 200) {
+        final geoList = json.decode(geoRes.body) as List;
+        if (geoList.isNotEmpty) {
+          lat = double.tryParse(geoList[0]['lat'].toString());
+          lng = double.tryParse(geoList[0]['lon'].toString());
+        }
+      }
+
+      final Uri aladhanUrl;
+      if (lat != null && lng != null) {
+        aladhanUrl = Uri.parse('http://api.aladhan.com/v1/timings?latitude=$lat&longitude=$lng');
+      } else {
+        aladhanUrl = Uri.parse('http://api.aladhan.com/v1/timingsByCity?city=${Uri.encodeComponent(city)}&country=France');
+      }
+
+      final res = await http.get(aladhanUrl).timeout(const Duration(seconds: 5));
       if (res.statusCode == 200) {
         final data = json.decode(res.body)['data'];
         final timings = data['timings'];
         final meta = data['meta'] ?? {};
         final hijri = data['date']['hijri'] ?? {};
+
+        final resLat = lat ?? double.tryParse(meta['latitude'].toString()) ?? 48.8566;
+        final resLng = lng ?? double.tryParse(meta['longitude'].toString()) ?? 2.3522;
 
         setState(() {
           _prayerTimes['Fajr'] = timings['Fajr'] ?? _prayerTimes['Fajr']!;
@@ -4341,7 +4363,7 @@ class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
           _prayerTimes['Isha'] = timings['Isha'] ?? _prayerTimes['Isha']!;
 
           _timezone = meta['timezone'] ?? 'UTC';
-          _gpsCoords = 'Lat: ${meta['latitude']}°, Lng: ${meta['longitude']}°';
+          _gpsCoords = 'Lat: ${resLat.toStringAsFixed(4)}°, Lng: ${resLng.toStringAsFixed(4)}°';
           _calculationMethod = meta['method']?['name'] ?? 'Méthode Standard';
           _hijriDate = '${hijri['day']} ${hijri['month']?['en']} ${hijri['year']} AH';
           _isVerified = true;
