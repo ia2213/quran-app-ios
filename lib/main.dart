@@ -1694,6 +1694,8 @@ class _QuranHomeState extends State<QuranHome> {
           RecitationScreen(),
           DownloadScreen(),
           MemorizationSrsScreen(),
+          SearchQuranScreen(),
+          PrayerAdhkarScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -1728,6 +1730,16 @@ class _QuranHomeState extends State<QuranHome> {
               icon: Icon(Icons.psychology_outlined),
               selectedIcon: Icon(Icons.psychology),
               label: 'Mémorisation',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.search_outlined),
+              selectedIcon: Icon(Icons.search),
+              label: 'Recherche',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.mosque_outlined),
+              selectedIcon: Icon(Icons.mosque),
+              label: 'Prières & Adhkar',
             ),
           ],
         ),
@@ -3981,6 +3993,286 @@ class _DownloadScreenState extends State<DownloadScreen> {
         ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
+  }
+}
+
+// ============================================================
+// SEARCH QURAN SCREEN
+// ============================================================
+
+class SearchQuranScreen extends StatefulWidget {
+  const SearchQuranScreen({super.key});
+
+  @override
+  State<SearchQuranScreen> createState() => _SearchQuranScreenState();
+}
+
+class _SearchQuranScreenState extends State<SearchQuranScreen> {
+  final TextEditingController _searchCtrl = TextEditingController(text: 'paradis');
+  bool _searching = false;
+  List<Map<String, dynamic>> _results = [];
+
+  final List<Map<String, dynamic>> _sampleDatabase = [
+    {
+      'surah': 1, 'verse': 1, 'surahName': 'Al-Faatiha',
+      'arabic': 'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
+      'translation': 'Au nom d\'Allah, le Tout Miséricordieux, le Très Miséricordieux.'
+    },
+    {
+      'surah': 2, 'verse': 25, 'surahName': 'Al-Baqara',
+      'arabic': 'وَبَشِّرِ الَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ أَنَّ لَهُمْ جَنَّاتٍ',
+      'translation': 'Annonce à ceux qui croient et pratiquent de bonnes œuvres qu\'ils auront pour demeures des jardins (Paradis) sous lesquels coulent les ruisseaux.'
+    },
+    {
+      'surah': 2, 'verse': 82, 'surahName': 'Al-Baqara',
+      'arabic': 'وَالَّذِينَ آمَنُوا وَعَمِلُوا الصَّالِحَاتِ أُولَٰئِكَ أَصْحَابُ الْجَنَّةِ',
+      'translation': 'Et ceux qui croient et pratiquent les bonnes œuvres, ceux-là sont les gens du Paradis où ils demeureront éternellement.'
+    },
+    {
+      'surah': 112, 'verse': 1, 'surahName': 'Al-Ikhlaas',
+      'arabic': 'قُلْ هُوَ اللَّهُ أَحَدٌ',
+      'translation': 'Dis: «Il est Allah, Unique.'
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _performSearch('paradis');
+  }
+
+  void _performSearch(String q) {
+    if (q.isEmpty) return;
+    setState(() => _searching = true);
+    final clean = q.toLowerCase();
+    final matches = _sampleDatabase.where((r) {
+      final tr = (r['translation'] as String).toLowerCase();
+      final ar = (r['arabic'] as String);
+      return tr.contains(clean) || ar.contains(q);
+    }).toList();
+
+    setState(() {
+      _results = matches;
+      _searching = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Recherche Coranique'),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _searchCtrl,
+              decoration: InputDecoration(
+                hintText: 'Rechercher un mot (ex: paradis, paix)...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.send_rounded),
+                  onPressed: () => _performSearch(_searchCtrl.text),
+                ),
+                filled: true,
+                fillColor: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF3F4F6),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onSubmitted: _performSearch,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _searching
+                  ? const Center(child: CircularProgressIndicator())
+                  : _results.isEmpty
+                      ? const Center(child: Text('Aucun verset trouvé.', style: TextStyle(color: Colors.grey)))
+                      : ListView.builder(
+                          itemCount: _results.length,
+                          itemBuilder: (context, idx) {
+                            final item = _results[idx];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Sourate ${item['surahName']} — Verset ${item['verse']}',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: primaryColor),
+                                      ),
+                                      const Icon(Icons.bookmark_outline, size: 18, color: Colors.grey),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    item['arabic'],
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                                    textDirection: TextDirection.rtl,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    item['translation'],
+                                    style: const TextStyle(fontSize: 13, fontStyle: FontStyle.italic),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// PRAYER TIMES & ADHKAR SCREEN
+// ============================================================
+
+class PrayerAdhkarScreen extends StatefulWidget {
+  const PrayerAdhkarScreen({super.key});
+
+  @override
+  State<PrayerAdhkarScreen> createState() => _PrayerAdhkarScreenState();
+}
+
+class _PrayerAdhkarScreenState extends State<PrayerAdhkarScreen> {
+  int _section = 0; // 0 = Prières, 1 = Adhkar
+
+  final Map<String, String> _prayerTimes = {
+    'Fajr': '05:46',
+    'Lever du soleil': '07:34',
+    'Dhuhr': '13:44',
+    'Asr': '17:09',
+    'Maghrib': '19:53',
+    'Isha': '21:34',
+  };
+
+  final List<Map<String, String>> _adhkarMatin = [
+    {
+      'ar': 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ',
+      'fr': 'Nous sommes au matin et la royauté appartient à Allah, louange à Allah.'
+    },
+    {
+      'ar': 'اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا',
+      'fr': 'O Allah ! C\'est par Toi que nous sommes au matin, par Toi que nous sommes au soir, par Toi que nous vivons.'
+    }
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Prières & Citadelle Adhkar'),
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _section == 0 ? primaryColor : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+                    foregroundColor: _section == 0 ? Colors.white : Colors.grey,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => setState(() => _section = 0),
+                  child: const Text('🕌 Prières', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _section == 1 ? primaryColor : (isDark ? const Color(0xFF1C1C1E) : Colors.white),
+                    foregroundColor: _section == 1 ? Colors.white : Colors.grey,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => setState(() => _section = 1),
+                  child: const Text('🤲 Adhkar', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (_section == 0) ...[
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Horaires de Prière — Paris', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Icon(Icons.location_on, color: Colors.red, size: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  ..._prayerTimes.entries.map((e) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(e.key, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                            Text(e.value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: primaryColor)),
+                          ],
+                        ),
+                      )),
+                ],
+              ),
+            ),
+          ] else ...[
+            ..._adhkarMatin.map((item) => Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E7EB)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item['ar']!, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textDirection: TextDirection.rtl),
+                      const SizedBox(height: 8),
+                      Text(item['fr']!, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
+                  ),
+                )),
+          ],
+        ],
+      ),
     );
   }
 }
