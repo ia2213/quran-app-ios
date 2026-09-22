@@ -50,3 +50,6 @@ android/local.properties
 
 # Widget Preview related
 .widget_preview/
+*.zip
+apk_parts/
+apk_send/

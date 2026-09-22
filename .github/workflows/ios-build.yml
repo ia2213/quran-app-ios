@@ -35,7 +35,7 @@ jobs:
 
       - name: Build iOS IPA
         run: |
-          flutter build ios --release --no-codesign
+          flutter build ios --no-codesign
           APP_DIR=$(find build/ios/iphoneos -name "*.app" -type d | head -1)
           mkdir -p Payload
           cp -r "$APP_DIR" Payload/
